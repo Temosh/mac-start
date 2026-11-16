@@ -41,6 +41,67 @@ final class LayoutStore {
         Array(layout.searchResults(matching: query, in: catalog).prefix(preferences.pageCapacity))
     }
 
+    /// The folder with `id`, if it still exists.
+    func folder(withID id: UUID) -> Folder? {
+        guard let position = layout.position(ofFolder: id),
+            case .folder(let folder) = layout.pages[position.page].items[position.slot]
+        else {
+            return nil
+        }
+        return folder
+    }
+
+    // MARK: - Editing
+
+    /// Moves the item at `source` to `destination`. See `Layout.moveItem(from:to:pageCapacity:)`.
+    func moveItem(from source: LayoutLocation, to destination: GridPosition) {
+        edit { $0.moveItem(from: source, to: destination, pageCapacity: preferences.pageCapacity) }
+    }
+
+    /// Drops the app at `source` onto the item at `target`, making or joining a folder. A new folder is named
+    /// after the apps' App Store category. Returns the folder's identifier.
+    @discardableResult
+    func dropApp(from source: LayoutLocation, onto target: GridPosition) -> UUID? {
+        var folderID: UUID?
+        edit { layout in
+            folderID = layout.dropApp(
+                from: source,
+                onto: target,
+                newFolderName: { targetID, droppedID in
+                    Folder.defaultName(target: self.catalog[targetID], dropped: self.catalog[droppedID])
+                },
+                pageCapacity: preferences.pageCapacity
+            )
+        }
+        return folderID
+    }
+
+    /// Moves an app out of its folder into the slot after the folder.
+    func removeApp(fromFolder id: UUID, at index: Int) {
+        edit { $0.removeApp(fromFolder: id, at: index, pageCapacity: preferences.pageCapacity) }
+    }
+
+    /// Reorders an app inside its folder.
+    func moveApp(inFolder id: UUID, from index: Int, to destination: Int) {
+        edit { $0.moveApp(inFolder: id, from: index, to: destination) }
+    }
+
+    func renameFolder(_ id: UUID, to name: String) {
+        edit { $0.renameFolder(id, to: name) }
+    }
+
+    /// Applies an edit, reconciles the result so every invariant holds, and saves it when it changed.
+    private func edit(_ change: (inout Layout) -> Void) {
+        var edited = layout
+        change(&edited)
+        let reconciled = edited.reconciled(with: catalog, pageCapacity: preferences.pageCapacity)
+        guard reconciled != layout else {
+            return
+        }
+        layout = reconciled
+        save()
+    }
+
     /// Reads the stored layout, then scans and reconciles. Call once at launch.
     func load() async {
         if let stored = await Self.readStoredLayout(from: fileStore) {

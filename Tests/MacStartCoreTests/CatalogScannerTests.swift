@@ -6,7 +6,12 @@ import Testing
 struct CatalogScannerTests {
     @Test func findsAppsInSubfoldersButNotInsideBundles() throws {
         try withTemporaryDirectory { root in
-            try makeAppBundle(at: root.appending(path: "Alpha.app"), bundleIdentifier: "test.alpha", version: "1.0")
+            try makeAppBundle(
+                at: root.appending(path: "Alpha.app"),
+                bundleIdentifier: "test.alpha",
+                version: "1.0",
+                category: "public.app-category.utilities"
+            )
             try makeAppBundle(at: root.appending(path: "Tools/Beta.app"), bundleIdentifier: "test.beta", version: "2.1")
             try makeAppBundle(
                 at: root.appending(path: "Alpha.app/Contents/Helpers/Helper.app"), bundleIdentifier: "test.helper")
@@ -19,6 +24,7 @@ struct CatalogScannerTests {
             let alpha = try #require(catalog.apps.first { $0.id.bundleIdentifier == "test.alpha" })
             #expect(alpha.displayName == "Alpha")
             #expect(alpha.version == "1.0")
+            #expect(alpha.categoryIdentifier == "public.app-category.utilities")
         }
     }
 

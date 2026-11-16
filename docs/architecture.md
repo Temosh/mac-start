@@ -30,6 +30,7 @@ Sources/
     Persistence/           JSON format, layout.json store, preferences store, export/import
     Search/                Search matching and ranking
     Navigation/            Keyboard selection movement across grid pages
+    Editing/               Moves, folder creation, and folder edits from drag and drop
     LogArea.swift          Logger categories shared by both modules
   MacStart/                Executable. App entry and everything AppKit/SwiftUI.
     App/                   Entry point, AppDelegate, dependency wiring, LayoutStore
@@ -70,6 +71,7 @@ These folders are the agreed layout. They are created as the code is written.
 | Overlay window | Borderless, non-activating `NSPanel` hosting SwiftUI through `NSHostingView`, at window level `statusBar + 1` (above the Dock and menu bar, below pop-up menus), joining the active Space and full-screen Spaces | Covers the whole screen like Launchpad, while context menus still appear on top |
 | Focus | The panel takes keyboard focus without activating MacStart. When MacStart was active, as after a Dock click, hiding the overlay activates the previously active app | The app the user was in stays active underneath |
 | Keyboard | A local key monitor takes the arrow keys, Return, and Escape before the focused search field; every other key goes to the field | Typing searches at once, while the grid stays keyboard driven |
+| Drag and drop | Custom SwiftUI drag gestures with a coordinator, not system drag and drop, so icons make room live. Pages are not lazy, and a folder panel stays invisible during a drag out of it, because removing the dragged tile would end its gesture | Launchpad-like reflow, folder creation by resting on an icon, and page turns at the screen edges |
 | Show and hide animation | The content view's layer fades with an explicit Core Animation fade, after its final opacity is set; SwiftUI scales the content | `NSWindow.animator()` alpha can stall at its start value, for example while the display sleeps, which would leave an invisible overlay |
 | Target display | `NSScreen.screens.first`, the display that holds the menu bar | `NSScreen.main` follows keyboard focus, which is not the main display |
 | Background | `NSVisualEffectView` blur behind the grid | Native look like Launchpad |

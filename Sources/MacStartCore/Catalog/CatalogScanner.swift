@@ -133,6 +133,7 @@ public struct CatalogScanner: Sendable {
             id: AppID(path: candidate.path, bundleIdentifier: bundleIdentifier),
             displayName: displayName(atPath: candidate.path),
             version: info["CFBundleShortVersionString"] as? String,
+            categoryIdentifier: info["LSApplicationCategoryType"] as? String,
             bundleURL: candidate.bundleURL
         )
     }

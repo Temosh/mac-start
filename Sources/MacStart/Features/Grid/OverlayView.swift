@@ -6,11 +6,21 @@ struct OverlayActions {
     let launch: @MainActor (InstalledApp) -> Void
     let dismiss: @MainActor () -> Void
     let showPage: @MainActor (Int) -> Void
+    let openFolder: @MainActor (UUID) -> Void
+    let closeFolder: @MainActor () -> Void
+    let renameFolder: @MainActor (UUID, String) -> Void
+    let removeFromFolder: @MainActor (UUID, Int) -> Void
+    let showInFinder: @MainActor (InstalledApp) -> Void
+    let dragChanged: @MainActor (DragUpdate) -> Void
+    let dragEnded: @MainActor () -> Void
 }
 
 /// The overlay's content: the search field over the paged grid and its page dots, the search results, or the
-/// loading and empty states.
+/// loading and empty states, plus the open folder and the tile being dragged.
 struct OverlayView: View {
+    /// The coordinate space of the whole overlay, which drag locations use.
+    static let coordinateSpace = "overlay"
+
     let store: LayoutStore
     @Bindable var state: OverlayState
     let icons: IconProvider
@@ -31,10 +41,17 @@ struct OverlayView: View {
                 Color.black.opacity(contrast == .increased ? 0.45 : 0.2)
                     .contentShape(Rectangle())
                     .onTapGesture { actions.dismiss() }
-                content(metrics: metrics, size: geometry.size)
+                content(metrics: metrics)
+                folderPanel(metrics: metrics)
                 SearchField(query: $state.query, isFocused: $isSearchFocused, isHighContrast: contrast == .increased)
                     .position(x: geometry.size.width / 2, y: metrics.topInset / 2)
+                if let drag = state.drag {
+                    DraggedTileView(item: drag.item, style: metrics.tileStyle, store: store, icons: icons)
+                        .position(drag.tileCenter)
+                        .allowsHitTesting(false)
+                }
             }
+            .coordinateSpace(.named(Self.coordinateSpace))
         }
         .ignoresSafeArea()
         .scaleEffect(state.isPresented || reduceMotion ? 1 : 1.06)
@@ -51,12 +68,12 @@ struct OverlayView: View {
     }
 
     @ViewBuilder
-    private func content(metrics: GridMetrics, size: CGSize) -> some View {
+    private func content(metrics: GridMetrics) -> some View {
         if !store.hasLoaded {
             ProgressView()
                 .controlSize(.large)
         } else if state.isSearching {
-            searchResults(metrics: metrics, size: size)
+            searchResults(metrics: metrics)
         } else if store.layout.placedAppIDs.isEmpty {
             message("No apps found")
         } else {
@@ -64,6 +81,7 @@ struct OverlayView: View {
                 pages: store.layout.pages,
                 currentPage: $state.currentPage,
                 selection: state.selection,
+                drag: state.drag,
                 metrics: metrics,
                 store: store,
                 icons: icons,
@@ -85,20 +103,41 @@ struct OverlayView: View {
     }
 
     @ViewBuilder
-    private func searchResults(metrics: GridMetrics, size: CGSize) -> some View {
+    private func searchResults(metrics: GridMetrics) -> some View {
         let results = store.searchResults(matching: state.query)
         if results.isEmpty {
             message("No results")
         } else {
             PageView(
                 items: results.map { .app($0.id) },
+                pageIndex: nil,
                 selectedSlot: state.selection?.slot,
+                drag: nil,
                 metrics: metrics,
                 store: store,
                 icons: icons,
                 actions: actions
             )
-            .frame(width: size.width, height: size.height)
+            .frame(width: metrics.overlaySize.width, height: metrics.overlaySize.height)
+        }
+    }
+
+    /// The open folder's panel. It also stays, invisible, while an app dragged out of it is still moving.
+    @ViewBuilder
+    private func folderPanel(metrics: GridMetrics) -> some View {
+        if let folderID = state.openFolderID ?? state.drag?.draggedFolderID, let folder = store.folder(withID: folderID)
+        {
+            FolderPanelView(
+                folder: folder,
+                isVisible: state.openFolderID == folderID,
+                metrics: FolderPanelMetrics(grid: metrics, appCount: folder.apps.count),
+                grid: metrics,
+                state: state,
+                store: store,
+                icons: icons,
+                actions: actions
+            )
+            .id(folderID)
         }
     }
 

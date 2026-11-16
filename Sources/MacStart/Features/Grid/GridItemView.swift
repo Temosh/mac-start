@@ -1,30 +1,60 @@
 import MacStartCore
 import SwiftUI
 
-/// One grid slot: an app that launches on click, or a folder.
+/// One tile: an app that launches on click, or a folder that opens on click. Tiles with a place in the layout
+/// can be dragged.
 struct GridItemView: View {
     let item: Item
-    /// True when the keyboard selection is on this slot.
+    /// True when the keyboard selection is on this tile.
     let isSelected: Bool
-    let metrics: GridMetrics
+    /// True while a dragged app rests on this tile, so a drop here makes or fills a folder.
+    let isFolderTarget: Bool
+    let style: TileStyle
+    /// Where the tile sits, for dragging and the context menu. Nil for search results, which cannot be dragged.
+    let dragContext: DragContext?
     let store: LayoutStore
     let icons: IconProvider
     let actions: OverlayActions
 
     var body: some View {
+        tile
+            .scaleEffect(isFolderTarget ? 1.15 : 1)
+            .animation(.easeOut(duration: 0.15), value: isFolderTarget)
+            .simultaneousGesture(dragGesture, including: dragContext == nil ? .subviews : .all)
+    }
+
+    @ViewBuilder
+    private var tile: some View {
         switch item {
         case .app(let id):
             if let app = store.app(for: id) {
                 appTile(app)
             }
         case .folder(let folder):
-            TileLabel(title: folder.name, subtitle: nil, isSelected: isSelected, metrics: metrics) {
-                FolderIcon(apps: folder.apps.compactMap { store.app(for: $0) }, icons: icons)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(folder.name) folder")
-            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            folderTile(folder)
         }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .named(OverlayView.coordinateSpace))
+            .onChanged { value in
+                guard let dragContext else {
+                    return
+                }
+                actions.dragChanged(
+                    DragUpdate(
+                        source: dragContext.source,
+                        item: item,
+                        location: value.location,
+                        startLocation: value.startLocation,
+                        grid: dragContext.grid,
+                        folderPanel: dragContext.folderPanel
+                    )
+                )
+            }
+            .onEnded { _ in
+                actions.dragEnded()
+            }
     }
 
     private func appTile(_ app: InstalledApp) -> some View {
@@ -33,7 +63,13 @@ struct GridItemView: View {
         return Button {
             actions.launch(app)
         } label: {
-            TileLabel(title: app.displayName, subtitle: subtitle, isSelected: isSelected, metrics: metrics) {
+            TileLabel(
+                title: app.displayName,
+                subtitle: subtitle,
+                isSelected: isSelected,
+                isHighlighted: isFolderTarget,
+                style: style
+            ) {
                 Image(nsImage: icons.icon(for: app))
                     .resizable()
                     .interpolation(.high)
@@ -41,7 +77,37 @@ struct GridItemView: View {
         }
         .buttonStyle(TileButtonStyle())
         .focusEffectDisabled()
+        .contextMenu {
+            Button("Show in Finder") {
+                actions.showInFinder(app)
+            }
+            if case .inFolder(let folderID, let index)? = dragContext?.source {
+                Button("Remove from Folder") {
+                    actions.removeFromFolder(folderID, index)
+                }
+            }
+        }
         .accessibilityLabel(subtitle.map { "\(app.displayName), version \($0)" } ?? app.displayName)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func folderTile(_ folder: Folder) -> some View {
+        Button {
+            actions.openFolder(folder.id)
+        } label: {
+            TileLabel(
+                title: folder.name,
+                subtitle: nil,
+                isSelected: isSelected,
+                isHighlighted: isFolderTarget,
+                style: style
+            ) {
+                FolderIcon(apps: folder.apps.compactMap { store.app(for: $0) }, icons: icons)
+            }
+        }
+        .buttonStyle(TileButtonStyle())
+        .focusEffectDisabled()
+        .accessibilityLabel("\(folder.name) folder")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -51,7 +117,9 @@ struct TileLabel<Icon: View>: View {
     let title: String
     let subtitle: String?
     let isSelected: Bool
-    let metrics: GridMetrics
+    /// True for a folder drop target.
+    let isHighlighted: Bool
+    let style: TileStyle
     let icon: Icon
 
     @Environment(\.colorSchemeContrast) private var contrast
@@ -60,44 +128,46 @@ struct TileLabel<Icon: View>: View {
         title: String,
         subtitle: String?,
         isSelected: Bool,
-        metrics: GridMetrics,
+        isHighlighted: Bool = false,
+        style: TileStyle,
         @ViewBuilder icon: () -> Icon
     ) {
         self.title = title
         self.subtitle = subtitle
         self.isSelected = isSelected
-        self.metrics = metrics
+        self.isHighlighted = isHighlighted
+        self.style = style
         self.icon = icon()
     }
 
     var body: some View {
         let isHighContrast = contrast == .increased
-        VStack(spacing: metrics.iconSize * 0.06) {
+        VStack(spacing: style.iconSize * 0.06) {
             icon
-                .frame(width: metrics.iconSize, height: metrics.iconSize)
+                .frame(width: style.iconSize, height: style.iconSize)
             Text(title)
-                .font(.system(size: metrics.labelFontSize, weight: .medium))
+                .font(.system(size: style.labelFontSize, weight: .medium))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .truncationMode(.tail)
             if let subtitle {
                 Text(subtitle)
-                    .font(.system(size: metrics.labelFontSize * 0.85))
+                    .font(.system(size: style.labelFontSize * 0.85))
                     .foregroundStyle(.white.opacity(isHighContrast ? 0.95 : 0.75))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
         }
-        .frame(maxWidth: metrics.cellSize.width * 0.92)
+        .frame(maxWidth: style.maxLabelWidth)
         .shadow(color: .black.opacity(isHighContrast ? 0.9 : 0.45), radius: isHighContrast ? 3 : 2, y: 1)
-        .padding(metrics.iconSize * 0.1)
+        .padding(style.iconSize * 0.1)
         .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: metrics.iconSize * 0.2, style: .continuous)
+            if isSelected || isHighlighted {
+                RoundedRectangle(cornerRadius: style.iconSize * 0.2, style: .continuous)
                     .fill(.white.opacity(isHighContrast ? 0.3 : 0.2))
                     .overlay {
                         if isHighContrast {
-                            RoundedRectangle(cornerRadius: metrics.iconSize * 0.2, style: .continuous)
+                            RoundedRectangle(cornerRadius: style.iconSize * 0.2, style: .continuous)
                                 .strokeBorder(.white, lineWidth: 2)
                         }
                     }
@@ -112,6 +182,35 @@ struct TileButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .brightness(configuration.isPressed ? -0.25 : 0)
+    }
+}
+
+/// The tile that follows the pointer during a drag.
+struct DraggedTileView: View {
+    let item: Item
+    let style: TileStyle
+    let store: LayoutStore
+    let icons: IconProvider
+
+    var body: some View {
+        Group {
+            switch item {
+            case .app(let id):
+                if let app = store.app(for: id) {
+                    TileLabel(title: app.displayName, subtitle: nil, isSelected: false, style: style) {
+                        Image(nsImage: icons.icon(for: app))
+                            .resizable()
+                            .interpolation(.high)
+                    }
+                }
+            case .folder(let folder):
+                TileLabel(title: folder.name, subtitle: nil, isSelected: false, style: style) {
+                    FolderIcon(apps: folder.apps.compactMap { store.app(for: $0) }, icons: icons)
+                }
+            }
+        }
+        .scaleEffect(1.08)
+        .opacity(0.95)
     }
 }
 

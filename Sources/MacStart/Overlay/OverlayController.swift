@@ -17,6 +17,9 @@ final class OverlayController: NSObject, NSWindowDelegate {
     private let icons: IconProvider
     private let launcher: AppLauncher
     private lazy var panel = makePanel()
+    private lazy var drags = DragCoordinator(store: store, state: state) { [weak self] page in
+        self?.showPage(page)
+    }
     /// Bumped on every show and hide, so a hide that finishes late cannot close a panel shown again meanwhile.
     private var visibilityGeneration = 0
     private var scrollMonitor: Any?
@@ -90,6 +93,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             return
         }
         state.isPresented = false
+        drags.cancel()
         removeEventMonitors()
         visibilityGeneration += 1
         let generation = visibilityGeneration
@@ -156,6 +160,9 @@ final class OverlayController: NSObject, NSWindowDelegate {
     }
 
     private func launch(_ app: InstalledApp) {
+        guard !drags.suppressesClick else {
+            return
+        }
         hide(restoringFocus: false)
         Task {
             do {
@@ -210,6 +217,16 @@ final class OverlayController: NSObject, NSWindowDelegate {
         // While an input method composes text, its keys belong to the input method.
         guard panel.isKeyWindow, !hasModifiers, !isComposingText else {
             return false
+        }
+        if state.drag != nil {
+            guard keyCode == kVK_Escape else {
+                return false
+            }
+            drags.cancel()
+            return true
+        }
+        if state.openFolderID != nil {
+            return handleFolderKey(keyCode: keyCode)
         }
         switch keyCode {
         case kVK_Escape:
@@ -277,15 +294,91 @@ final class OverlayController: NSObject, NSWindowDelegate {
             return
         }
         let items = store.layout.pages[selection.page].items
-        // A selected folder does nothing until folders can be opened.
+        guard items.indices.contains(selection.slot) else {
+            return
+        }
+        switch items[selection.slot] {
+        case .app(let id):
+            if let app = store.app(for: id) {
+                launch(app)
+            }
+        case .folder(let folder):
+            openFolder(folder.id)
+        }
+    }
+
+    // MARK: - Folders
+
+    /// Keys while a folder is open. Escape closes it. While its name is being edited, every other key goes to the
+    /// name field; otherwise the arrow keys move the selection through the folder and Return launches the app.
+    private func handleFolderKey(keyCode: Int) -> Bool {
+        if keyCode == kVK_Escape {
+            closeFolder()
+            return true
+        }
+        guard !state.isEditingFolderName else {
+            return false
+        }
+        switch keyCode {
+        case kVK_Return, kVK_ANSI_KeypadEnter:
+            launchFolderSelection()
+        case kVK_LeftArrow:
+            moveFolderSelection(.left)
+        case kVK_RightArrow:
+            moveFolderSelection(.right)
+        case kVK_UpArrow:
+            moveFolderSelection(.up)
+        case kVK_DownArrow:
+            moveFolderSelection(.down)
+        default:
+            return false
+        }
+        return true
+    }
+
+    private func openFolder(_ id: UUID) {
+        guard !drags.suppressesClick else {
+            return
+        }
+        state.openFolder(id)
+    }
+
+    /// Closes the open folder and gives the keyboard back to the search field.
+    private func closeFolder() {
+        state.closeFolder()
+        state.searchFocusRequest += 1
+    }
+
+    private func moveFolderSelection(_ direction: GridDirection) {
+        guard let folderID = state.openFolderID, let folder = store.folder(withID: folderID) else {
+            return
+        }
+        // The same column count as the folder panel.
+        let columns = min(max(folder.apps.count, 1), store.preferences.gridColumns)
+        let navigation = GridNavigation(columns: columns, itemCounts: [folder.apps.count])
+        let current = state.folderSelection.map { GridPosition(page: 0, slot: $0) }
+        if let next = navigation.position(after: direction, from: current, onPage: 0) {
+            state.folderSelection = next.slot
+        }
+    }
+
+    private func launchFolderSelection() {
         guard
-            items.indices.contains(selection.slot),
-            case .app(let id) = items[selection.slot],
-            let app = store.app(for: id)
+            let folderID = state.openFolderID,
+            let folder = store.folder(withID: folderID),
+            let index = state.folderSelection,
+            folder.apps.indices.contains(index),
+            let app = store.app(for: folder.apps[index])
         else {
             return
         }
         launch(app)
+    }
+
+    /// Shows the app in Finder. Finder takes the focus, which closes the overlay.
+    private func showInFinder(_ app: InstalledApp) {
+        hide(restoringFocus: false)
+        NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: app.id.path)])
     }
 
     /// Takes a key press that reached the panel itself, which happens when the search field lost the focus.
@@ -385,7 +478,14 @@ final class OverlayController: NSObject, NSWindowDelegate {
         let actions = OverlayActions(
             launch: { [weak self] app in self?.launch(app) },
             dismiss: { [weak self] in self?.hide() },
-            showPage: { [weak self] page in self?.showPage(page) }
+            showPage: { [weak self] page in self?.showPage(page) },
+            openFolder: { [weak self] id in self?.openFolder(id) },
+            closeFolder: { [weak self] in self?.closeFolder() },
+            renameFolder: { [weak self] id, name in self?.store.renameFolder(id, to: name) },
+            removeFromFolder: { [weak self] id, index in self?.store.removeApp(fromFolder: id, at: index) },
+            showInFinder: { [weak self] app in self?.showInFinder(app) },
+            dragChanged: { [weak self] update in self?.drags.update(update) },
+            dragEnded: { [weak self] in self?.drags.end() }
         )
         panel.setContent(OverlayView(store: store, state: state, icons: icons, actions: actions))
         return panel

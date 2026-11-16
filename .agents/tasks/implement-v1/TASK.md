@@ -20,9 +20,9 @@ Do the milestones in order, one session each. M1 and M2 may share a session. Whe
   Done when: the local checks pass.
 - [x] **M2 Core domain.** In `MacStartCore`: the entities from `docs/domain-model.md` (`AppID`, `InstalledApp`, `Catalog`, `Folder`, `Item`, `Page`, `Layout`, `Preferences`, `Export`), reconcile with all six invariants, the catalog scan of the three app roots, the JSON codec with `schemaVersion`, the atomic file store, and export and import with schema validation.
   Done when: `swift test` covers reconcile (duplicate collapsing, rebinding by bundle identifier, hidden apps kept when uninstalled, folder dissolving, page overflow, empty page removal), the export/import round trip, rejection of unknown schema versions, and catalog scanning against temporary bundle fixtures.
-- [ ] **M3 Overlay and grid.** The Carbon hotkey (default Option-S), the Dock icon click, the overlay panel with its blur, placement, and animation, `LayoutStore`, the debounced FSEvents watcher, the icon cache, the paged grid with page dots and paging, launching, and closing (Escape, empty-area click, focus loss). The empty-catalog and launch-failure states from `docs/ui.md`.
+- [x] **M3 Overlay and grid.** The Carbon hotkey (default Option-S), the Dock icon click, the overlay panel with its blur, placement, and animation, `LayoutStore`, the debounced FSEvents watcher, the icon cache, the paged grid with page dots and paging, launching, and closing (Escape, empty-area click, focus loss). The empty-catalog and launch-failure states from `docs/ui.md`.
   Done when: the developer confirms by hand that the hotkey and Dock icon toggle the overlay, and that apps launch.
-- [ ] **M4 Search and keyboard.** Type-to-search into one results grid with hidden apps excluded, arrow keys and Return, the two-step Escape, the version subtitle for duplicate names, and the accessibility rules from `docs/ui.md` (labels, roles, keyboard use, Increase Contrast).
+- [x] **M4 Search and keyboard.** Type-to-search into one results grid with hidden apps excluded, arrow keys and Return, the two-step Escape, the version subtitle for duplicate names, and the accessibility rules from `docs/ui.md` (labels, roles, keyboard use, Increase Contrast).
   Done when: the developer confirms search and keyboard use by hand.
 - [ ] **M5 Organize.** Drag to reorder, drag to the screen edge to change page, drop an app onto an app to create a folder, the folder panel with inline rename, drag out of a folder, and the context menu (Show in Finder, Remove from Folder).
   Done when: the developer confirms drag and drop and folders by hand.
@@ -55,7 +55,7 @@ Handoff state:
   - `Export(jsonData:)` and `jsonData()` for import and export.
   - `invariantViolations(catalog:pageCapacity:)`, which can back a debug assertion in `LayoutStore`.
 - Use `InstalledApp.bundleURL`, not the `AppID` path, for icons and launching, because it is the target of a linked app.
-- M3: built on 2026-11-16 and waiting for the developer's check by hand. Build, 52 tests, lint, and packaging pass. The agent could not see the screen: it was locked with the display asleep. So the run was checked only through logs and window state:
+- M3: built on 2026-11-16; the developer checked it by hand and accepted it for now ("looks okish"). Build, 52 tests, lint, and packaging pass. The agent could not see the screen: it was locked with the display asleep. So the run was checked only through logs and window state:
   - At launch, the hotkey registers and the scan finds 112 apps. `layout.json` is written with pages of 35, 35, 35, and 7 items.
   - The panel covers the full display frame at alpha 1. Reopening the app (the Dock click event) hides it, and reopening again shows it.
   - While the display sleeps, the window server keeps new windows at 90% scale, because their opening transition never runs. That is the environment, not the app. Recheck with the display awake.
@@ -64,8 +64,16 @@ Handoff state:
   - A click on an app launches it and closes the overlay. A click between icons, Escape, switching apps, or switching Spaces closes it. The app you were in gets the focus back.
   - A two-finger swipe, a mouse wheel, the left and right arrow keys, and the page dots all change pages.
   - The overlay also opens over a full-screen app.
-- Left for later milestones: opening folders (M5, folders already render) and the Dock icon menu with Settings (M6).
-- M4: built on 2026-11-16 and waiting for the developer's check by hand. 69 tests pass. Search ranking (`Layout.searchResults(matching:in:)`) and arrow-key movement (`GridNavigation`) are in `MacStartCore` and tested. The screen was locked, so only a launch smoke test ran: the overlay shows at 1800 x 1169, alpha 1, and toggles. Return on a selected folder does nothing until M5.
+- Left for M6: the Dock icon menu with Settings, and Hide in the context menu.
+- M5: built on 2026-11-16 and waiting for the developer's check by hand. 86 tests pass; the layout edits (`Layout.moveItem`, `dropApp`, `removeApp(fromFolder:)`, `moveApp(inFolder:)`, `renameFolder`) are in `MacStartCore` and tested. The agent did not launch the app, because the developer was at the screen.
+- Developer's checks for M5:
+  - Dragging an icon makes the others shift live. The drop lands where the gap is, including on another page after resting at a screen edge.
+  - Resting a dragged app on another app highlights it, and the drop makes a folder named after the app category. Dropping onto a folder adds the app.
+  - A click on a folder opens its panel. The name edits in place. A click outside or Escape closes it. Arrows and Return work inside.
+  - Dragging inside the folder reorders it. Dragging out closes the folder and places the app in the grid.
+  - Right-click shows Show in Finder, plus Remove from Folder inside a folder.
+  - A click on an icon still launches it, and a drag never launches.
+- M4: built on 2026-11-16; the developer checked it by hand and accepted it for now ("looks okish"). 69 tests pass. Search ranking (`Layout.searchResults(matching:in:)`) and arrow-key movement (`GridNavigation`) are in `MacStartCore` and tested. The screen was locked, so only a launch smoke test ran: the overlay shows at 1800 x 1169, alpha 1, and toggles. Return on a selected folder does nothing until M5.
 - Developer's checks for M4:
   - Typing filters to one grid of results right away, without clicking the field. The best match is first and highlighted, and Return launches it.
   - The arrow keys move the highlight through the results and through the grid. In the grid, left and right at the edge change page.

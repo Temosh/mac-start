@@ -33,12 +33,13 @@ func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {
 }
 
 /// Creates a minimal app bundle: `Contents/Info.plist` with the given keys.
-func makeAppBundle(at url: URL, bundleIdentifier: String?, version: String? = nil) throws {
+func makeAppBundle(at url: URL, bundleIdentifier: String?, version: String? = nil, category: String? = nil) throws {
     let contents = url.appending(path: "Contents", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
     var info = ["CFBundlePackageType": "APPL"]
     info["CFBundleIdentifier"] = bundleIdentifier
     info["CFBundleShortVersionString"] = version
+    info["LSApplicationCategoryType"] = category
     let data = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
     try data.write(to: contents.appending(path: "Info.plist"))
 }

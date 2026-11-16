@@ -71,6 +71,16 @@ The catalog holds every `.app` bundle with an `Info.plist` under `/Applications`
 - Wrapped iOS apps are read through their `WrappedBundle` link.
 - Background-only and menu bar apps are listed like any other app. The user hides the ones they never launch.
 
+## Editing
+
+Every edit is followed by reconcile, so the invariants always hold. Positions count the way the overlay shows them during a drag: with the dragged item already taken out.
+
+- Moving an item puts it into the destination slot; the items from there on move one slot later. A destination one page past the last page adds a page. Overflow cascades as in reconcile.
+- Dropping an app onto an app replaces the target with a folder of the target and the dropped app, in that order. The folder is named after the target app's App Store category (`LSApplicationCategoryType`, for example "Developer Tools"), else the dropped app's, else "Folder".
+- Dropping an app onto a folder appends it. A folder cannot go into another folder.
+- "Remove from Folder" puts the app into the slot right after the folder. A folder left with one app dissolves into that app.
+- Renaming trims surrounding whitespace; an empty name keeps the old one.
+
 ## Search
 
 Search matches only placed apps, including apps inside folders. Hidden apps never appear in results.

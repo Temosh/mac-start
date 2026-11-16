@@ -1,3 +1,4 @@
+import Foundation
 import MacStartCore
 import Observation
 
@@ -17,15 +18,38 @@ final class OverlayState {
             }
             // The best result is selected, so Return launches it.
             selection = isSearching ? GridPosition(page: 0, slot: 0) : nil
+            if isSearching {
+                closeFolder()
+            }
         }
     }
     /// The keyboard selection. While searching, it points into the results, which count as page 0.
     var selection: GridPosition?
     /// Bumped to move keyboard focus to the search field.
     var searchFocusRequest = 0
+    /// The folder whose panel is open.
+    var openFolderID: UUID?
+    /// The keyboard selection inside the open folder, as an index into its apps.
+    var folderSelection: Int?
+    /// True while the open folder's name is being edited, so its field gets the arrow keys and Return.
+    var isEditingFolderName = false
+    /// The drag in progress.
+    var drag: DragSession?
 
     var isSearching: Bool {
         !query.allSatisfy(\.isWhitespace)
+    }
+
+    func openFolder(_ id: UUID) {
+        openFolderID = id
+        folderSelection = nil
+        selection = nil
+    }
+
+    func closeFolder() {
+        openFolderID = nil
+        folderSelection = nil
+        isEditingFolderName = false
     }
 
     /// Moves to the last page when the current one no longer exists.
@@ -35,9 +59,11 @@ final class OverlayState {
         }
     }
 
-    /// Clears the search and the selection, for the next time the overlay opens.
+    /// Clears the search, the selection, the open folder, and any drag, for the next time the overlay opens.
     func reset() {
         query = ""
         selection = nil
+        drag = nil
+        closeFolder()
     }
 }

@@ -61,7 +61,7 @@ extension Layout {
     }
 
     /// Dissolves folders with fewer than 2 apps, removes empty pages, and cascades overflow to later pages.
-    private static func normalized(_ pages: [Page], pageCapacity: Int) -> [Page] {
+    static func normalized(_ pages: [Page], pageCapacity: Int) -> [Page] {
         let nonEmptyPages =
             pages
             .map { Page(items: $0.items.compactMap(normalizedFolder)) }

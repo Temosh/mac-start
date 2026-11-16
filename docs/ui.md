@@ -23,17 +23,19 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 |--------|--------|
 | Hotkey (default `⌥S`) | Toggles the overlay |
 | Click Dock icon | Toggles the overlay |
-| Escape | Clears the search text first; a second press closes the overlay |
+| Escape | Cancels a drag, else closes an open folder, else clears the search text, else closes the overlay |
 | Click on empty area | Closes the overlay |
 | Click app | Launches it and closes the overlay |
 | Horizontal two-finger swipe, scroll wheel, or arrow keys at the page edge | Changes page |
 | Typing | Goes to the search field, which has the focus while the overlay is open, and replaces the pages with one grid of the best results. Hidden apps are excluded |
 | Arrow keys | Move a selection through the grid or the results. The first press selects the first item of the page. Left and right at the page edge go to the same row of the previous or next page |
-| Return | Launches the selected app. While searching, the best result is selected after every keystroke, so Return launches it |
-| Drag app | Reorders it; dragging to the screen edge moves it to the next or previous page |
-| Drop app onto app | Creates a folder with a default name |
-| Click folder | Opens the folder panel over a dimmed grid. The folder name is editable inline |
-| Drag app out of folder panel | Removes it from the folder |
+| Return | Launches the selected app, or opens the selected folder. While searching, the best result is selected after every keystroke, so Return launches it |
+| Drag app or folder | Reorders it. The dragged icon keeps the spot where it was grabbed under the pointer. The other icons make room once it rests between them for a moment, so moving onto an icon never pushes that icon away. Resting at the left or right screen edge turns the page |
+| Rest a dragged app on an app, then drop | Creates a folder of both in the target's slot, named after the target app's App Store category, else the dropped app's, else "Folder" |
+| Rest a dragged app on a folder, then drop | Adds the app to the end of the folder |
+| Click folder | Opens the folder panel over a dimmed grid. The folder name is editable inline. A click outside the panel or Escape closes it; inside, the arrow keys and Return work as in the grid |
+| Drag app inside folder panel | Reorders the folder's apps |
+| Drag app out of folder panel | Closes the folder; the drop removes the app from the folder and places it in the grid, or in another folder |
 | Right-click app | Context menu: Hide, Show in Finder, Remove from Folder (in folders) |
 | Losing focus (app switch, Space change) | Closes the overlay |
 

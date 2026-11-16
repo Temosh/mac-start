@@ -26,6 +26,8 @@ final class OverlayPanel: NSPanel {
         isMovable = false
         isReleasedWhenClosed = false
         animationBehavior = .none
+        // Launchpad is dark in both appearances; white labels need a dark blur.
+        appearance = NSAppearance(named: .darkAqua)
     }
 
     /// Hosts `rootView` on top of a blur of whatever is behind the panel.
