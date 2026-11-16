@@ -58,7 +58,7 @@ Significant decisions made after the initial project baseline are recorded as AD
 
 ## Commands
 
-The package and scripts are created with the first code task. Until they exist, these commands are the agreed interface:
+Run these from the repository root:
 
 ```bash
 swift build                          # Debug build of all targets
@@ -101,15 +101,6 @@ Use only the rules that apply to the current task:
 | `.agents/rules/documentation-and-diagrams.md` | Documentation conventions and mandatory Mermaid diagram rules |
 | `.agents/rules/code-conventions.md` | Language-agnostic code conventions |
 | `.agents/rules/code-conventions-swift-macos.md` | Swift desktop macOS app conventions |
-
-## Skill Index
-
-Use skills only when they match the task:
-
-| Skill | Purpose |
-|-------|---------|
-| `.agents/skills/project-initialization/SKILL.md` | First setup pass for a new project: gather context, ask clarifying questions, create initial docs, and replace template placeholders with real project guidance |
-| `.agents/skills/agents-project-setup/SKILL.md` | Installs this agent setup into an empty or existing project without overwriting anything, consolidates existing agent instructions, and runs `project-initialization`; also re-checks the setup and recreates the local discovery links |
 
 ## Source Layout
 

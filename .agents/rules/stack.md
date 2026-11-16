@@ -11,7 +11,7 @@
   - assembles `build/MacStart.app` (`Contents/MacOS/MacStart`, `Contents/Info.plist` from `Support/Info.plist`, `Contents/Resources/AppIcon.icns` built by `iconutil` from `Support/AppIcon.iconset`);
   - signs it with `codesign --force --sign -`.
 - `build/` and `*.app` are git-ignored.
-- Formatting and linting use the `swift format` bundled with the toolchain. Once a `.swift-format` config exists, it owns the style.
+- Formatting and linting use the `swift format` bundled with the toolchain. The `.swift-format` file at the repository root owns the style: 4-space indentation, 120-column lines, and the default rules otherwise.
 - CI: GitHub Actions (`.github/workflows/build.yml`) on the `xcode-27` runner with Xcode 27.2 selected. It builds, tests, packages, and publishes the zipped app. Details: `docs/operations.md`.
 - "Done" means `swift build`, `swift test`, and `scripts/build-app.sh` all succeed locally, and CI is green.
 - `scripts/build-app.sh` must run unattended, without prompts or GUI tools, so the same script works locally and in CI.

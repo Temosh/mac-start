@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode 27.2
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Set version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "MACSTART_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "MACSTART_VERSION=0.0.0" >> "$GITHUB_ENV"
+          fi
+          echo "MACSTART_BUILD=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Package
+        run: scripts/build-app.sh
+
+      # ditto, not zip: it keeps the code signature and the bundle's symlinks intact.
+      - name: Zip
+        run: ditto -c -k --keepParent build/MacStart.app "MacStart-$MACSTART_VERSION.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: MacStart
+          path: MacStart-*.zip
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: MacStart
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" MacStart-*.zip
+          --repo "$GITHUB_REPOSITORY"
+          --title "MacStart $GITHUB_REF_NAME"
+          --generate-notes

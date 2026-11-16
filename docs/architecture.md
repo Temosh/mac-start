@@ -21,12 +21,14 @@ flowchart LR
 
 ```text
 Package.swift
+.swift-format              swift format configuration; owns the code style
 Sources/
   MacStartCore/            Library. Foundation only: no AppKit, no SwiftUI.
     Model/                 AppID, App, Folder, Item, Page, Layout, Preferences
     Reconcile/             Pure reconcile and invariant checks
     Catalog/               App bundle scanning (FileManager + Bundle)
     Persistence/           Layout JSON codec, file store, export/import
+    LogArea.swift          Logger categories shared by both modules
   MacStart/                Executable. App entry and everything AppKit/SwiftUI.
     App/                   Entry point, AppDelegate, dependency wiring
     Overlay/               Overlay window and controller, show/hide, display choice
@@ -41,9 +43,10 @@ Tests/
   MacStartCoreTests/       Swift Testing; reconcile, codec, catalog scan fixtures
 Support/
   Info.plist               Bundle metadata; copied into the .app by the build script
-  AppIcon.iconset/         Converted to AppIcon.icns with iconutil
+  AppIcon.iconset/         Placeholder icon PNGs; converted to AppIcon.icns with iconutil
 scripts/
   build-app.sh             swift build, assemble MacStart.app, ad hoc codesign
+  make-placeholder-icon.swift  Draws the placeholder AppIcon.iconset
 .github/workflows/
   build.yml                CI: build, test, package, artifact, release on tag
 ```

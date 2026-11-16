@@ -4,11 +4,11 @@ MacStart is built either locally or by GitHub Actions. The developer downloads t
 
 ## CI Build
 
-Workflow file: `.github/workflows/build.yml`. It is created together with the first code, `Package.swift` and `scripts/build-app.sh`.
+Workflow file: `.github/workflows/build.yml`.
 
 ```mermaid
 flowchart LR
-    T["push to main / pull request / tag v* / manual run"] --> B["swift build + swift test"]
+    T["push to master / pull request / tag v* / manual run"] --> B["swift build + swift test"]
     B --> A["scripts/build-app.sh"]
     A --> Z["ditto zip: MacStart-VERSION.zip"]
     Z --> U["workflow artifact (every run)"]
@@ -25,7 +25,7 @@ flowchart LR
   5. Run `scripts/build-app.sh`.
   6. Zip with `ditto -c -k --keepParent build/MacStart.app MacStart-<version>.zip`. Use `ditto`, not `zip`: it preserves the code signature and the bundle's symlinks.
   7. Upload the zip as a workflow artifact.
-- **Release:** a pushed tag `vX.Y.Z` also creates a GitHub Release with the zip attached. That job needs `permissions: contents: write`.
+- **Release:** a pushed tag `vX.Y.Z` also runs the `release` job on `ubuntu-latest`. It downloads the zip artifact and creates a GitHub Release with the zip attached. Only that job gets `permissions: contents: write`; the build job can only read.
 - **No secrets:** the app is signed ad hoc, so the workflow uses no signing certificates.
 
 ## Versioning

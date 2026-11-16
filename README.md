@@ -30,7 +30,7 @@ The app is signed ad hoc for local use. It has no sandbox and is not notarized.
 
 ## Download
 
-GitHub Actions builds every push. Tagged versions are published as GitHub Releases. For install and update steps, including how to open a non-notarized app, see [docs/operations.md](docs/operations.md).
+GitHub Actions builds every push to `master` and every pull request. Tagged versions are published as GitHub Releases. For install and update steps, including how to open a non-notarized app, see [docs/operations.md](docs/operations.md).
 
 ## Documentation
 
@@ -44,12 +44,13 @@ GitHub Actions builds every push. Tagged versions are published as GitHub Releas
 
 ## Agent Setup
 
-`AGENTS.md` is the entry point for AI coding agents. `CLAUDE.md` imports it. Shared rules and skills live in `.agents/`.
+`AGENTS.md` is the entry point for AI coding agents. `CLAUDE.md` imports it. Shared rules and task notes live in `.agents/`.
 
-Agent tools find these rules and skills through local symlinks, which git ignores: `.claude/rules`, `.claude/skills`, and `.clinerules`. After a fresh clone, recreate them:
+Agent tools find the rules through local symlinks, which git ignores: `.claude/rules` and `.clinerules`. After a fresh clone, recreate them:
 
 ```bash
-python3 .agents/skills/agents-project-setup/scripts/setup.py links .
+mkdir -p .claude && ln -s ../.agents/rules .claude/rules
+ln -s .agents/rules .clinerules
 ```
 
 ## License
