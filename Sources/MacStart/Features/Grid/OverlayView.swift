@@ -46,11 +46,7 @@ struct OverlayView: View {
                 folderPanel(metrics: metrics)
                 SearchField(query: $state.query, isFocused: $isSearchFocused, isHighContrast: contrast == .increased)
                     .position(x: geometry.size.width / 2, y: metrics.topInset / 2)
-                if let drag = state.drag {
-                    DraggedTileView(item: drag.item, style: metrics.tileStyle, store: store, icons: icons)
-                        .position(drag.tileCenter)
-                        .allowsHitTesting(false)
-                }
+                DragLayer(state: state, style: metrics.tileStyle, store: store, icons: icons)
             }
             .coordinateSpace(.named(Self.coordinateSpace))
         }
@@ -80,7 +76,7 @@ struct OverlayView: View {
         } else {
             PagedGridView(
                 pages: store.layout.pages,
-                currentPage: $state.currentPage,
+                state: state,
                 selection: state.selection,
                 drag: state.drag,
                 metrics: metrics,
@@ -93,7 +89,7 @@ struct OverlayView: View {
                     Spacer()
                     PageIndicator(
                         pageCount: store.layout.pages.count,
-                        currentPage: state.currentPage ?? 0,
+                        currentPage: state.currentPage,
                         isHighContrast: contrast == .increased,
                         select: { actions.showPage($0) }
                     )
@@ -114,6 +110,7 @@ struct OverlayView: View {
                 pageIndex: nil,
                 selectedSlot: state.selection?.slot,
                 drag: nil,
+                state: state,
                 metrics: metrics,
                 store: store,
                 icons: icons,
@@ -147,6 +144,23 @@ struct OverlayView: View {
             .font(.title2)
             .foregroundStyle(.white.opacity(0.85))
             .allowsHitTesting(false)
+    }
+}
+
+/// The copy of the dragged tile that follows the pointer. It reads the pointer itself, so pointer moves redraw only
+/// this view.
+struct DragLayer: View {
+    let state: OverlayState
+    let style: TileStyle
+    let store: LayoutStore
+    let icons: IconProvider
+
+    var body: some View {
+        if let drag = state.drag, let center = state.dragTileCenter {
+            DraggedTileView(item: drag.item, style: style, store: store, icons: icons)
+                .position(center)
+                .allowsHitTesting(false)
+        }
     }
 }
 

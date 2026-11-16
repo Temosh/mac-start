@@ -48,26 +48,34 @@ final class DragCoordinator {
         guard var drag = state.drag else {
             return
         }
-        drag.location = update.location
+        state.dragLocation = update.location
+        let tileCenter = drag.tileCenter(for: update.location)
 
         if let openFolderID = state.openFolderID, drag.draggedFolderID == openFolderID, let panel = update.folderPanel {
             if panel.frame.contains(update.location) {
                 let count = max((store.folder(withID: openFolderID)?.apps.count ?? 1) - 1, 0)
-                drag.folderGapIndex = min(panel.slot(at: drag.tileCenter), count)
-                state.drag = drag
+                drag.folderGapIndex = min(panel.slot(at: tileCenter), count)
+                commit(drag)
                 return
             }
             // Leaving the folder closes it. The drag goes on in the grid, and a drop takes the app out.
             state.openFolderID = nil
             state.folderSelection = nil
             drag.folderGapIndex = nil
-            drag.page = state.currentPage ?? 0
+            drag.page = state.currentPage
             drag.gapSlot = nil
         }
 
-        updateGrid(&drag, metrics: update.grid)
-        state.drag = drag
+        updateGrid(&drag, tileCenter: tileCenter, metrics: update.grid)
+        commit(drag)
         updateEdgeTimer(location: update.location, metrics: update.grid)
+    }
+
+    /// Stores the drag only when it changed, because every store redraws the tiles.
+    private func commit(_ drag: DragSession) {
+        if state.drag != drag {
+            state.drag = drag
+        }
     }
 
     /// Commits the drop.
@@ -111,15 +119,15 @@ final class DragCoordinator {
             folderGapIndex = index
             tileCenter = update.folderPanel?.center(ofSlot: index) ?? update.startLocation
         }
+        state.dragLocation = update.location
         state.drag = DragSession(
             source: update.source,
             item: update.item,
-            location: update.location,
             grabOffset: CGSize(
                 width: tileCenter.x - update.startLocation.x,
                 height: tileCenter.y - update.startLocation.y
             ),
-            page: state.currentPage ?? 0,
+            page: state.currentPage,
             gapSlot: gapSlot,
             folderTargetSlot: nil,
             folderGapIndex: folderGapIndex
@@ -130,12 +138,12 @@ final class DragCoordinator {
 
     /// Aims the drop: at the icon under the dragged icon after it rests there, or at the gap, which moves under
     /// the dragged icon after it rests between icons.
-    private func updateGrid(_ drag: inout DragSession, metrics: GridMetrics) {
+    private func updateGrid(_ drag: inout DragSession, tileCenter: CGPoint, metrics: GridMetrics) {
         let count = itemCountWithoutDraggedItem(onPage: drag.page, drag: drag)
-        let hoveredSlot = metrics.slot(at: drag.tileCenter)
+        let hoveredSlot = metrics.slot(at: tileCenter)
         let hoveredItem = itemIndex(showingAt: hoveredSlot, gapSlot: drag.gapSlot, count: count)
 
-        if let hoveredItem, drag.item.isApp, metrics.isNearTile(drag.tileCenter, ofSlot: hoveredSlot) {
+        if let hoveredItem, drag.item.isApp, metrics.isNearTile(tileCenter, ofSlot: hoveredSlot) {
             stopReflowTimer()
             if folderCandidateSlot != hoveredItem {
                 drag.folderTargetSlot = nil
@@ -254,7 +262,8 @@ final class DragCoordinator {
         stopReflowTimer()
         drag.page = page
         drag.folderTargetSlot = nil
-        drag.gapSlot = min(metrics.slot(at: drag.tileCenter), itemCountWithoutDraggedItem(onPage: page, drag: drag))
+        let tileCenter = drag.tileCenter(for: state.dragLocation)
+        drag.gapSlot = min(metrics.slot(at: tileCenter), itemCountWithoutDraggedItem(onPage: page, drag: drag))
         state.drag = drag
         showPage(page)
     }

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import MacStartCore
 import Observation
@@ -8,8 +9,14 @@ import Observation
 final class OverlayState {
     /// Drives the show and hide animation.
     var isPresented = false
-    /// The page the grid shows, bound to the scroll position. Nil while a swipe is between pages.
-    var currentPage: Int? = 0
+    /// The page the grid shows.
+    var currentPage = 0
+    /// How far a swipe in progress has moved the pages, in points. Only the pager reads it, so swipe frames do
+    /// not rebuild the tiles.
+    var pageOffset: CGFloat = 0
+    /// The pointer during a drag, in overlay coordinates. It is kept apart from `drag`, which changes only when
+    /// the drop target does, so a moving pointer does not rebuild the tiles.
+    var dragLocation = CGPoint.zero
     /// The search text. Any text besides whitespace replaces the pages with one grid of results.
     var query = "" {
         didSet {
@@ -36,6 +43,11 @@ final class OverlayState {
     /// The drag in progress.
     var drag: DragSession?
 
+    /// The center of the dragged tile, which follows the pointer.
+    var dragTileCenter: CGPoint? {
+        drag.map { $0.tileCenter(for: dragLocation) }
+    }
+
     var isSearching: Bool {
         !query.allSatisfy(\.isWhitespace)
     }
@@ -54,8 +66,8 @@ final class OverlayState {
 
     /// Moves to the last page when the current one no longer exists.
     func clampPage(toPageCount pageCount: Int) {
-        if let currentPage, currentPage >= pageCount {
-            self.currentPage = max(pageCount - 1, 0)
+        if currentPage >= pageCount {
+            currentPage = max(pageCount - 1, 0)
         }
     }
 
@@ -64,6 +76,7 @@ final class OverlayState {
         query = ""
         selection = nil
         drag = nil
+        pageOffset = 0
         closeFolder()
     }
 }

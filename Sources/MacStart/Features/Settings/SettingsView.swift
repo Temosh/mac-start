@@ -116,7 +116,7 @@ struct HiddenAppRow: View {
         HStack {
             Group {
                 if let app = hidden.app {
-                    Image(nsImage: icons.icon(for: app))
+                    Image(nsImage: icons.icon(for: app, side: 24))
                         .resizable()
                         .interpolation(.high)
                 } else {

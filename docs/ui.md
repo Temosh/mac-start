@@ -26,7 +26,7 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 | Escape | Cancels a drag, else closes an open folder, else clears the search text, else closes the overlay |
 | Click on empty area | Closes the overlay |
 | Click app | Launches it and closes the overlay |
-| Horizontal two-finger swipe, scroll wheel, or arrow keys at the page edge | Changes page |
+| Horizontal two-finger swipe, scroll wheel, or arrow keys at the page edge | Changes page. A swipe moves the pages with the fingers; a short flick, or a slow swipe over 8% of the screen width, turns the page, and a spring settles it. Past the first or last page the pages stretch a little and spring back. A mouse wheel turns one page per notch |
 | Typing | Goes to the search field, which has the focus while the overlay is open, and replaces the pages with one grid of the best results. Hidden apps are excluded |
 | Arrow keys | Move a selection through the grid or the results. The first press selects the first item of the page. Left and right at the page edge go to the same row of the previous or next page |
 | Return | Launches the selected app, or opens the selected folder. While searching, the best result is selected after every keystroke, so Return launches it |

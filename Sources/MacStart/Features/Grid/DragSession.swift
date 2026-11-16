@@ -3,12 +3,10 @@ import Foundation
 import MacStartCore
 
 /// A drag in progress. Slots and indexes count the way the overlay shows them: with the dragged item taken out.
-struct DragSession {
+struct DragSession: Equatable {
     /// Where the dragged item came from.
     let source: LayoutLocation
     let item: Item
-    /// The pointer, in overlay coordinates.
-    var location: CGPoint
     /// From the pointer to the dragged tile's center, as it was when the drag started. The tile keeps the spot
     /// where it was grabbed under the pointer.
     let grabOffset: CGSize
@@ -21,8 +19,8 @@ struct DragSession {
     /// While the drag is inside the open folder: the index among the folder's apps where the app would land.
     var folderGapIndex: Int?
 
-    /// The center of the dragged tile, which aims the drop.
-    var tileCenter: CGPoint {
+    /// The center of the dragged tile, which aims the drop, for the pointer at `location`.
+    func tileCenter(for location: CGPoint) -> CGPoint {
         CGPoint(x: location.x + grabOffset.width, y: location.y + grabOffset.height)
     }
 

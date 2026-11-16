@@ -1,10 +1,11 @@
 import MacStartCore
 import SwiftUI
 
-/// The pages side by side in a paged horizontal scroll view, so a two-finger swipe moves one page.
+/// The pages side by side in one row, moved to the current page. A two-finger swipe moves the row with the
+/// fingers; the controller then settles it on a page.
 struct PagedGridView: View {
     let pages: [Page]
-    @Binding var currentPage: Int?
+    let state: OverlayState
     let selection: GridPosition?
     let drag: DragSession?
     let metrics: GridMetrics
@@ -13,30 +14,49 @@ struct PagedGridView: View {
     let actions: OverlayActions
 
     var body: some View {
-        ScrollView(.horizontal) {
-            // Not lazy: the page a drag started on keeps its tiles while other pages show, because removing the
-            // dragged tile would end its drag gesture.
-            HStack(spacing: 0) {
-                ForEach(pages.indices, id: \.self) { index in
-                    PageView(
-                        items: pages[index].items,
-                        pageIndex: index,
-                        selectedSlot: selection?.page == index ? selection?.slot : nil,
-                        drag: drag,
-                        metrics: metrics,
-                        store: store,
-                        icons: icons,
-                        actions: actions
-                    )
-                    .containerRelativeFrame([.horizontal, .vertical])
-                    .id(index)
-                }
+        // Not lazy: the page a drag started on keeps its tiles while other pages show, because removing the
+        // dragged tile would end its drag gesture.
+        HStack(spacing: 0) {
+            ForEach(pages.indices, id: \.self) { index in
+                PageView(
+                    items: pages[index].items,
+                    pageIndex: index,
+                    selectedSlot: selection?.page == index ? selection?.slot : nil,
+                    drag: drag,
+                    state: state,
+                    metrics: metrics,
+                    store: store,
+                    icons: icons,
+                    actions: actions
+                )
+                .frame(width: metrics.overlaySize.width, height: metrics.overlaySize.height)
             }
-            .scrollTargetLayout()
         }
-        .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $currentPage)
-        .scrollIndicators(.hidden)
+        .frame(width: metrics.overlaySize.width, height: metrics.overlaySize.height, alignment: .leading)
+        .modifier(PagerOffset(state: state, pageWidth: metrics.overlaySize.width))
+    }
+}
+
+/// Moves the row of pages to the current page, plus the offset of a swipe in progress. The state is read here, in
+/// a modifier, so swipe frames move the row without rebuilding the pages inside it.
+struct PagerOffset: ViewModifier {
+    let state: OverlayState
+    let pageWidth: CGFloat
+
+    func body(content: Content) -> some View {
+        content.offset(x: -CGFloat(state.currentPage) * pageWidth + state.pageOffset)
+    }
+}
+
+/// Places a tile. The dragged tile follows the pointer, read here, in a modifier, so pointer moves only move that
+/// one tile.
+struct TilePosition: ViewModifier {
+    let state: OverlayState
+    let position: CGPoint
+    let followsDrag: Bool
+
+    func body(content: Content) -> some View {
+        content.position(followsDrag ? (state.dragTileCenter ?? position) : position)
     }
 }
 
@@ -49,6 +69,7 @@ struct PageView: View {
     /// The keyboard selection on this page.
     let selectedSlot: Int?
     let drag: DragSession?
+    let state: OverlayState
     let metrics: GridMetrics
     let store: LayoutStore
     let icons: IconProvider
@@ -67,7 +88,10 @@ struct PageView: View {
                     style: metrics.tileStyle,
                     dragContext: pageIndex.map { page in
                         DragContext(
-                            source: .slot(GridPosition(page: page, slot: entry.slot)), grid: metrics, folderPanel: nil)
+                            source: .slot(GridPosition(page: page, slot: entry.slot)),
+                            grid: metrics,
+                            folderPanel: nil
+                        )
                     },
                     store: store,
                     icons: icons,
@@ -79,7 +103,13 @@ struct PageView: View {
                 .opacity(entry.isHidden ? 0 : 1)
                 .animation(nil, value: entry.isDragged)
                 .scaleEffect(entry.isDragged ? 1.08 : 1)
-                .position(entry.position)
+                .modifier(
+                    TilePosition(
+                        state: state,
+                        position: metrics.center(ofSlot: entry.displaySlot),
+                        followsDrag: entry.followsDrag
+                    )
+                )
                 .animation(.easeInOut(duration: 0.2), value: entry.displaySlot)
                 .animation(.easeOut(duration: 0.2), value: entry.isDragged)
             }
@@ -93,9 +123,10 @@ struct PageView: View {
         /// The slot the item shows in during a drag.
         let displaySlot: Int
         let isDragged: Bool
+        /// True for the dragged tile on the page under the drag, the only page whose coordinates match the
+        /// overlay's.
+        let followsDrag: Bool
         let isFolderTarget: Bool
-        /// Where the tile's center shows: its display slot, or under the dragged copy while it is dragged.
-        let position: CGPoint
         /// True for the dragged tile, and for a tile pushed past the last slot until the drop moves it to the next
         /// page.
         let isHidden: Bool
@@ -109,8 +140,8 @@ struct PageView: View {
                     slot: slot,
                     displaySlot: slot,
                     isDragged: false,
+                    followsDrag: false,
                     isFolderTarget: false,
-                    position: metrics.center(ofSlot: slot),
                     isHidden: false
                 )
             }
@@ -128,16 +159,14 @@ struct PageView: View {
         var visibleIndex = 0
         for (slot, item) in items.enumerated() {
             if slot == draggedSlot {
-                // Only on the page under the drag does the overlay's coordinate space match this page's.
-                let position = drag.page == pageIndex ? drag.tileCenter : metrics.center(ofSlot: slot)
                 result.append(
                     Entry(
                         item: item,
                         slot: slot,
                         displaySlot: slot,
                         isDragged: true,
+                        followsDrag: drag.page == pageIndex,
                         isFolderTarget: false,
-                        position: position,
                         isHidden: true
                     )
                 )
@@ -150,8 +179,8 @@ struct PageView: View {
                     slot: slot,
                     displaySlot: displaySlot,
                     isDragged: false,
+                    followsDrag: false,
                     isFolderTarget: visibleIndex == folderTargetSlot,
-                    position: metrics.center(ofSlot: displaySlot),
                     isHidden: displaySlot >= metrics.pageCapacity
                 )
             )

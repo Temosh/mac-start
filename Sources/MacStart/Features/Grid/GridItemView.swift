@@ -70,7 +70,7 @@ struct GridItemView: View {
                 isHighlighted: isFolderTarget,
                 style: style
             ) {
-                Image(nsImage: icons.icon(for: app))
+                Image(nsImage: icons.icon(for: app, side: style.iconSize))
                     .resizable()
                     .interpolation(.high)
             }
@@ -148,21 +148,24 @@ struct TileLabel<Icon: View>: View {
         VStack(spacing: style.iconSize * 0.06) {
             icon
                 .frame(width: style.iconSize, height: style.iconSize)
-            Text(title)
-                .font(.system(size: style.labelFontSize, weight: .medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.system(size: style.labelFontSize * 0.85))
-                    .foregroundStyle(.white.opacity(isHighContrast ? 0.95 : 0.75))
+            // The shadow is on the text only: a shadow of every icon is the costliest part of a moving grid.
+            VStack(spacing: 0) {
+                Text(title)
+                    .font(.system(size: style.labelFontSize, weight: .medium))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
-                    .truncationMode(.middle)
+                    .truncationMode(.tail)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: style.labelFontSize * 0.85))
+                        .foregroundStyle(.white.opacity(isHighContrast ? 0.95 : 0.75))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
+            .shadow(color: .black.opacity(isHighContrast ? 0.9 : 0.45), radius: isHighContrast ? 3 : 2, y: 1)
         }
         .frame(maxWidth: style.maxLabelWidth)
-        .shadow(color: .black.opacity(isHighContrast ? 0.9 : 0.45), radius: isHighContrast ? 3 : 2, y: 1)
         .padding(style.iconSize * 0.1)
         .background {
             if isSelected || isHighlighted {
@@ -201,7 +204,7 @@ struct DraggedTileView: View {
             case .app(let id):
                 if let app = store.app(for: id) {
                     TileLabel(title: app.displayName, subtitle: nil, isSelected: false, style: style) {
-                        Image(nsImage: icons.icon(for: app))
+                        Image(nsImage: icons.icon(for: app, side: style.iconSize))
                             .resizable()
                             .interpolation(.high)
                     }
@@ -231,7 +234,7 @@ struct FolderIcon: View {
                 .fill(.white.opacity(0.22))
                 .overlay(alignment: .topLeading) {
                     ForEach(Array(apps.prefix(9).enumerated()), id: \.element.id) { index, app in
-                        Image(nsImage: icons.icon(for: app))
+                        Image(nsImage: icons.icon(for: app, side: miniSide))
                             .resizable()
                             .interpolation(.high)
                             .frame(width: miniSide, height: miniSide)

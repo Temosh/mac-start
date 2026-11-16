@@ -89,7 +89,13 @@ struct FolderPanelView: View {
                 .opacity(entry.isDragged ? 0 : 1)
                 .animation(nil, value: entry.isDragged)
                 .scaleEffect(entry.isDragged ? 1.08 : 1)
-                .position(entry.position)
+                .modifier(
+                    TilePosition(
+                        state: state,
+                        position: metrics.center(ofSlot: entry.displaySlot),
+                        followsDrag: entry.isDragged && isVisible
+                    )
+                )
                 .animation(.easeInOut(duration: 0.2), value: entry.displaySlot)
                 .animation(.easeOut(duration: 0.2), value: entry.isDragged)
             }
@@ -121,19 +127,15 @@ struct FolderPanelView: View {
         let app: InstalledApp
         let displaySlot: Int
         let isDragged: Bool
-        /// Where the tile's center shows: its display slot, or under the dragged copy while it is dragged.
-        let position: CGPoint
     }
 
     /// The folder's apps, making room where a dragged app would land.
     private var entries: [Entry] {
         var draggedIndex: Int?
         var gapIndex: Int?
-        var draggedCenter: CGPoint?
         if let drag = state.drag, case .inFolder(folder.id, let index) = drag.source {
             draggedIndex = index
             gapIndex = drag.folderGapIndex
-            draggedCenter = drag.tileCenter
         }
         var result: [Entry] = []
         var visibleIndex = 0
@@ -142,19 +144,12 @@ struct FolderPanelView: View {
                 continue
             }
             if index == draggedIndex {
-                let position = draggedCenter ?? metrics.center(ofSlot: index)
-                result.append(Entry(index: index, app: app, displaySlot: index, isDragged: true, position: position))
+                result.append(Entry(index: index, app: app, displaySlot: index, isDragged: true))
                 continue
             }
             let displaySlot = gapIndex.map { visibleIndex >= $0 ? visibleIndex + 1 : visibleIndex } ?? visibleIndex
             result.append(
-                Entry(
-                    index: index,
-                    app: app,
-                    displaySlot: displaySlot,
-                    isDragged: false,
-                    position: metrics.center(ofSlot: displaySlot)
-                )
+                Entry(index: index, app: app, displaySlot: displaySlot, isDragged: false)
             )
             visibleIndex += 1
         }

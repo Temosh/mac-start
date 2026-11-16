@@ -25,6 +25,8 @@ final class OverlayController: NSObject, NSWindowDelegate {
     private var scrollMonitor: Any?
     private var keyMonitor: Any?
     private var lastWheelPageTurn = Date.distantPast
+    /// The two-finger swipe in progress.
+    private var swipe: PageSwipeTracking?
     /// The last app other than MacStart that was active. It gets the focus back when the overlay closes while
     /// MacStart is active, for example after a click on the Dock icon.
     private var previousApp: NSRunningApplication?
@@ -143,20 +145,17 @@ final class OverlayController: NSObject, NSWindowDelegate {
         layer.add(fade, forKey: "fade")
     }
 
-    /// Scrolls to a page, clamped to the existing pages.
+    /// Moves to a page, clamped to the existing pages, with a spring from wherever a swipe left the pages.
     func showPage(_ index: Int) {
-        let pageCount = store.layout.pages.count
-        guard pageCount > 0 else {
-            return
-        }
-        let page = min(max(index, 0), pageCount - 1)
-        withAnimation(Self.reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+        let page = min(max(index, 0), max(store.layout.pages.count - 1, 0))
+        withAnimation(Self.reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.88)) {
             state.currentPage = page
+            state.pageOffset = 0
         }
     }
 
     private func turnPage(by offset: Int) {
-        showPage((state.currentPage ?? 0) + offset)
+        showPage(state.currentPage + offset)
     }
 
     private func launch(_ app: InstalledApp) {
@@ -265,7 +264,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         let itemCounts =
             state.isSearching
             ? [store.searchResults(matching: state.query).count] : store.layout.pages.map(\.items.count)
-        let page = state.isSearching ? 0 : (state.currentPage ?? 0)
+        let page = state.isSearching ? 0 : state.currentPage
         let navigation = GridNavigation(columns: store.preferences.gridColumns, itemCounts: itemCounts)
         guard let next = navigation.position(after: direction, from: state.selection, onPage: page) else {
             return
@@ -397,25 +396,76 @@ final class OverlayController: NSObject, NSWindowDelegate {
         return true
     }
 
-    /// Turns pages with a mouse wheel. Trackpads and the Magic Mouse scroll precisely, and the paged scroll view
-    /// handles their swipes itself.
+    /// Turns pages with two-finger swipes and mouse wheels while the grid shows.
     private func installScrollMonitor() {
         guard scrollMonitor == nil else {
             return
         }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            guard !event.hasPreciseScrollingDeltas else {
-                return event
-            }
-            let delta =
-                abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) ? event.scrollingDeltaY : event.scrollingDeltaX
-            guard delta != 0 else {
-                return event
-            }
+            let input = ScrollInput(event)
             // Local monitors run on the main thread.
-            MainActor.assumeIsolated { self?.turnPageForWheel(delta: delta) }
-            return nil
+            let isHandled = MainActor.assumeIsolated { self?.handleScroll(input) ?? false }
+            return isHandled ? nil : event
         }
+    }
+
+    /// A swipe moves the pages with the fingers and, when the fingers lift, settles on a page: a short flick is
+    /// enough to turn it. A mouse wheel turns one page per notch.
+    private func handleScroll(_ input: ScrollInput) -> Bool {
+        guard state.drag == nil, state.openFolderID == nil, !state.isSearching else {
+            return false
+        }
+        // Mouse wheels, and devices that scroll smoothly without gesture phases, turn pages notch by notch.
+        guard input.isPrecise, !(input.phase.isEmpty && input.momentumPhase.isEmpty) else {
+            let delta = abs(input.deltaY) >= abs(input.deltaX) ? input.deltaY : input.deltaX
+            if delta != 0 {
+                turnPageForWheel(delta: delta)
+            }
+            return true
+        }
+        // The swipe decided its page when the fingers lifted; momentum would only drag the pages further.
+        guard input.momentumPhase.isEmpty else {
+            return true
+        }
+        if input.phase.contains(.began) {
+            swipe = PageSwipeTracking()
+        }
+        if input.phase.contains(.changed), var tracking = swipe {
+            tracking.add(deltaX: input.deltaX, deltaY: input.deltaY, time: input.time)
+            swipe = tracking
+            if tracking.isHorizontal == true {
+                state.pageOffset = rubberBanded(tracking.offset)
+            }
+        }
+        if input.phase.contains(.ended) || input.phase.contains(.cancelled), let tracking = swipe {
+            swipe = nil
+            finishSwipe(tracking, endedAt: input.time, isCancelled: input.phase.contains(.cancelled))
+        }
+        return true
+    }
+
+    /// Past the first or the last page, the pages follow the fingers only a third of the way.
+    private func rubberBanded(_ offset: CGFloat) -> CGFloat {
+        let isPastFirst = state.currentPage == 0 && offset > 0
+        let isPastLast = state.currentPage >= store.layout.pages.count - 1 && offset < 0
+        return isPastFirst || isPastLast ? offset / 3 : offset
+    }
+
+    private func finishSwipe(_ tracking: PageSwipeTracking, endedAt time: TimeInterval, isCancelled: Bool) {
+        guard tracking.isHorizontal == true else {
+            return
+        }
+        let page =
+            isCancelled
+            ? state.currentPage
+            : PageSwipe.targetPage(
+                from: state.currentPage,
+                pageCount: store.layout.pages.count,
+                offset: Double(tracking.offset),
+                velocity: Double(tracking.velocity(at: time)),
+                pageWidth: Double(panel.frame.width)
+            )
+        showPage(page)
     }
 
     private func removeScrollMonitor() {
