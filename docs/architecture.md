@@ -24,10 +24,10 @@ Package.swift
 .swift-format              swift format configuration; owns the code style
 Sources/
   MacStartCore/            Library. Foundation only: no AppKit, no SwiftUI.
-    Model/                 AppID, App, Folder, Item, Page, Layout, Preferences
+    Model/                 AppID, App, Catalog, Folder, Item, Page, Layout, Preferences
     Reconcile/             Pure reconcile and invariant checks
     Catalog/               App bundle scanning (FileManager + Bundle)
-    Persistence/           Layout JSON codec, file store, export/import
+    Persistence/           JSON format, layout.json store, preferences store, export/import
     LogArea.swift          Logger categories shared by both modules
   MacStart/                Executable. App entry and everything AppKit/SwiftUI.
     App/                   Entry point, AppDelegate, dependency wiring
@@ -98,5 +98,5 @@ Catalog changes from FSEvents trigger a rescan, then `LayoutStore` reconciles an
 
 ## Testing Strategy
 
-- Unit tests cover `MacStartCore`: reconcile invariants, duplicate collapsing, the export/import round trip, schema version rejection, and catalog scanning against temporary bundle fixtures.
+- Unit tests cover `MacStartCore`: reconcile invariants, duplicate collapsing, the export/import round trip, schema version rejection, and catalog scanning against temporary bundle fixtures. A seeded random test reconciles hundreds of random layouts and checks every invariant.
 - The overlay, hotkey, and launching are verified manually by building and running the app. UI automation is out of scope for now.

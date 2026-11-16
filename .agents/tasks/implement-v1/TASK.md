@@ -18,7 +18,7 @@ Do the milestones in order, one session each. M1 and M2 may share a session. Whe
 
 - [ ] **M1 Scaffold.** `Package.swift` with the targets `MacStartCore`, `MacStart`, and `MacStartCoreTests`. `scripts/build-app.sh`. `Support/Info.plist`. A placeholder `Support/AppIcon.iconset`, drawn by `scripts/make-placeholder-icon.swift`. `.swift-format`. `.github/workflows/build.yml`. The app launches with a Dock icon and a main menu, and quits with Command-Q.
   Done when: the local checks pass, and CI is green on `master` after the push.
-- [ ] **M2 Core domain.** In `MacStartCore`: the entities from `docs/domain-model.md` (`AppID`, `App`, `Catalog`, `Folder`, `Item`, `Page`, `Layout`, `Preferences`, `Export`), reconcile with all six invariants, the catalog scan of the three app roots, the JSON codec with `schemaVersion`, the atomic file store, and export and import with schema validation.
+- [x] **M2 Core domain.** In `MacStartCore`: the entities from `docs/domain-model.md` (`AppID`, `App`, `Catalog`, `Folder`, `Item`, `Page`, `Layout`, `Preferences`, `Export`), reconcile with all six invariants, the catalog scan of the three app roots, the JSON codec with `schemaVersion`, the atomic file store, and export and import with schema validation.
   Done when: `swift test` covers reconcile (duplicate collapsing, rebinding by bundle identifier, hidden apps kept when uninstalled, folder dissolving, page overflow, empty page removal), the export/import round trip, rejection of unknown schema versions, and catalog scanning against temporary bundle fixtures.
 - [ ] **M3 Overlay and grid.** The Carbon hotkey (default Option-S), the Dock icon click and Dock menu, the overlay panel with its blur, placement, and animation, `LayoutStore`, the debounced FSEvents watcher, the icon cache, the paged grid with page dots and paging, launching, and closing (Escape, empty-area click, focus loss). The empty-catalog and launch-failure states from `docs/ui.md`.
   Done when: the developer confirms by hand that the hotkey and Dock icon toggle the overlay, and that apps launch.
@@ -47,4 +47,12 @@ Do the milestones in order, one session each. M1 and M2 may share a session. Whe
 Handoff state:
 
 - M1: every file is in place. On 2026-11-16, `swift build`, `swift test`, `scripts/build-app.sh`, and `swift format lint --strict -r Sources Tests` passed locally with no warnings. The built app runs as a foreground app with a Dock icon and logs `MacStart launched` under `cc.summ.MacStart:overlay`. M1 is committed. Still open: push it and get a green `Build` workflow run on GitHub; then tick M1.
-- `MacStartCore` so far holds only `LogArea`, and the test target holds one smoke test. M2 adds the domain model and its tests.
+- M2: done on 2026-11-16. 49 tests pass, including a seeded random reconcile test over 500 layouts. A scan of the developer's Mac found 112 apps in about 0.6 s, with Safari (a hidden-flagged link) included and duplicate links collapsed. The scan rules and file formats are in `docs/domain-model.md`.
+- For M3, the Core entry points are:
+  - `CatalogScanner(roots: CatalogScanner.standardRoots()).scan()`, which is synchronous file I/O, so run it off the main actor.
+  - `layout.reconciled(with:pageCapacity:)`, with the capacity from `Preferences.pageCapacity`.
+  - `LayoutFileStore(fileURL: LayoutFileStore.standardFileURL)` with `load()` and `save(_:)`.
+  - `PreferencesStore().load()`, which returns nil before the first save. That marks the first launch, when launch at login gets registered.
+  - `Export(jsonData:)` and `jsonData()` for import and export.
+  - `invariantViolations(catalog:pageCapacity:)`, which can back a debug assertion in `LayoutStore`.
+- Use `App.bundleURL`, not the `AppID` path, for icons and launching, because it is the target of a linked app.
