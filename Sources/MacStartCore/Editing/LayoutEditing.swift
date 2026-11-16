@@ -129,6 +129,16 @@ extension Layout {
         pages[position.page].items[position.slot] = .folder(folder)
     }
 
+    /// Hides an app. Reconcile then takes it out of its slot or folder, because hidden wins over placement.
+    public mutating func hide(_ id: AppID) {
+        hidden.insert(id)
+    }
+
+    /// Unhides an app. Reconcile then appends it to the last page, like a newly installed app.
+    public mutating func unhide(_ id: AppID) {
+        hidden.remove(id)
+    }
+
     /// Renames a folder. Surrounding whitespace is dropped, and an empty name keeps the old one.
     public mutating func renameFolder(_ id: UUID, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

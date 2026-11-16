@@ -49,4 +49,16 @@ struct PreferencesTests {
 
         #expect(PreferencesStore(storage: storage).load() == nil)
     }
+
+    @Test func aGlobalShortcutNeedsCommandOptionOrControlUnlessItIsAFunctionKey() {
+        let s: UInt16 = 0x01
+        let f5: UInt16 = 0x60
+
+        #expect(HotKey(keyCode: s, modifiers: [.option]).isUsableAsGlobalShortcut)
+        #expect(HotKey(keyCode: s, modifiers: [.command, .shift]).isUsableAsGlobalShortcut)
+        #expect(HotKey(keyCode: s, modifiers: [.control]).isUsableAsGlobalShortcut)
+        #expect(!HotKey(keyCode: s, modifiers: []).isUsableAsGlobalShortcut)
+        #expect(!HotKey(keyCode: s, modifiers: [.shift]).isUsableAsGlobalShortcut)
+        #expect(HotKey(keyCode: f5, modifiers: []).isUsableAsGlobalShortcut)
+    }
 }

@@ -41,7 +41,7 @@ Sources/
       Search/              Type-to-search, keyboard navigation
       Settings/            Hotkey, grid size, launch at login, hidden apps, export/import
     Platform/              Thin adapters: GlobalHotKey, CatalogWatcher, IconProvider,
-                           AppLauncher, LoginItem
+                           AppLauncher, LoginItem, KeyNames
 Tests/
   MacStartCoreTests/       Swift Testing; reconcile, codec, catalog scan fixtures
 Support/
@@ -81,7 +81,8 @@ These folders are the agreed layout. They are created as the code is written.
 | Layout storage | `~/Library/Application Support/MacStart/layout.json`, written atomically | Human-readable, and uses the same format as export |
 | Preferences | `Preferences` value in `MacStartCore`, stored in `UserDefaults` | Small settings, included in export |
 | Dock icon | `applicationShouldHandleReopen` toggles the overlay; `applicationDockMenu` adds Settings | Same entry point as Launchpad |
-| Launch at login | `SMAppService.mainApp`, registered on first launch, toggled in Settings | On by default |
+| Launch at login | `SMAppService.mainApp`, toggled in Settings. Every launch makes the registration match the preference, which registers it on the first launch and again after an update | On by default; each ad hoc signed build has a new signature that can invalidate the old registration |
+| Shortcut names | `UCKeyTranslate` with the current keyboard layout, plus symbols for special keys | Shows the key the user's layout types, like macOS menus do |
 
 ## Data Flow
 

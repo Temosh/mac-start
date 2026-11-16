@@ -484,6 +484,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             renameFolder: { [weak self] id, name in self?.store.renameFolder(id, to: name) },
             removeFromFolder: { [weak self] id, index in self?.store.removeApp(fromFolder: id, at: index) },
             showInFinder: { [weak self] app in self?.showInFinder(app) },
+            hide: { [weak self] app in self?.store.hide(app.id) },
             dragChanged: { [weak self] update in self?.drags.update(update) },
             dragEnded: { [weak self] in self?.drags.end() }
         )

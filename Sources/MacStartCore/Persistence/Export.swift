@@ -12,6 +12,15 @@ public struct Export: Hashable, Sendable {
         self.preferences = preferences
     }
 
+    /// An export of the current state, stamped with `date` cut to whole seconds, which is what the file keeps.
+    public static func snapshot(layout: Layout, preferences: Preferences, at date: Date = .now) -> Export {
+        Export(
+            exportedAt: Date(timeIntervalSince1970: date.timeIntervalSince1970.rounded(.down)),
+            layout: layout,
+            preferences: preferences
+        )
+    }
+
     /// The export file's content: UTF-8 JSON with `schemaVersion`, `exportedAt` in ISO 8601 UTC, `layout`, and
     /// `preferences`. ISO 8601 keeps whole seconds only.
     public func jsonData() throws -> Data {

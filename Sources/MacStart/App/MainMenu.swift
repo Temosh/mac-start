@@ -10,6 +10,9 @@ enum MainMenu {
         let mainMenu = NSMenu()
         mainMenu.addItem(submenuItem(makeAppMenu()))
         mainMenu.addItem(submenuItem(makeEditMenu()))
+        let windowMenu = makeWindowMenu()
+        mainMenu.addItem(submenuItem(windowMenu))
+        NSApp.windowsMenu = windowMenu
         return mainMenu
     }
 
@@ -20,6 +23,9 @@ enum MainMenu {
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
         )
+        menu.addItem(.separator())
+        // Sent up the responder chain to the app delegate.
+        menu.addItem(withTitle: "Settings…", action: #selector(AppDelegate.openSettings(_:)), keyEquivalent: ",")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Hide MacStart", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = menu.addItem(
@@ -35,6 +41,13 @@ enum MainMenu {
         )
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit MacStart", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        return menu
+    }
+
+    /// Close (Command-W) for the settings window.
+    private static func makeWindowMenu() -> NSMenu {
+        let menu = NSMenu(title: "Window")
+        menu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         return menu
     }
 

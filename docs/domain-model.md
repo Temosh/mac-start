@@ -80,6 +80,8 @@ Every edit is followed by reconcile, so the invariants always hold. Positions co
 - Dropping an app onto a folder appends it. A folder cannot go into another folder.
 - "Remove from Folder" puts the app into the slot right after the folder. A folder left with one app dissolves into that app.
 - Renaming trims surrounding whitespace; an empty name keeps the old one.
+- Hiding adds the app to the hidden set, and reconcile takes it out of its slot or folder. Unhiding removes it from the set, and reconcile appends it to the last page like a new app.
+- A global shortcut needs Command, Option, or Control, unless its key is a function key (F1–F20), so it never takes a key away from typing.
 
 ## Search
 

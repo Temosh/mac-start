@@ -78,6 +78,9 @@ struct GridItemView: View {
         .buttonStyle(TileButtonStyle())
         .focusEffectDisabled()
         .contextMenu {
+            Button("Hide") {
+                actions.hide(app)
+            }
             Button("Show in Finder") {
                 actions.showInFinder(app)
             }

@@ -95,4 +95,15 @@ struct ExportTests {
             return
         }
     }
+
+    @Test func aSnapshotKeepsWholeSecondsSoItSurvivesTheRoundTrip() throws {
+        let export = Export.snapshot(
+            layout: sample.layout,
+            preferences: sample.preferences,
+            at: Date(timeIntervalSince1970: 1_794_830_400.75)
+        )
+
+        #expect(export.exportedAt == Date(timeIntervalSince1970: 1_794_830_400))
+        #expect(try Export(jsonData: export.jsonData()) == export)
+    }
 }

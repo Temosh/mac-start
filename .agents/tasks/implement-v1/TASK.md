@@ -24,7 +24,7 @@ Do the milestones in order, one session each. M1 and M2 may share a session. Whe
   Done when: the developer confirms by hand that the hotkey and Dock icon toggle the overlay, and that apps launch.
 - [x] **M4 Search and keyboard.** Type-to-search into one results grid with hidden apps excluded, arrow keys and Return, the two-step Escape, the version subtitle for duplicate names, and the accessibility rules from `docs/ui.md` (labels, roles, keyboard use, Increase Contrast).
   Done when: the developer confirms search and keyboard use by hand.
-- [ ] **M5 Organize.** Drag to reorder, drag to the screen edge to change page, drop an app onto an app to create a folder, the folder panel with inline rename, drag out of a folder, and the context menu (Show in Finder, Remove from Folder).
+- [x] **M5 Organize.** Drag to reorder, drag to the screen edge to change page, drop an app onto an app to create a folder, the folder panel with inline rename, drag out of a folder, and the context menu (Show in Finder, Remove from Folder).
   Done when: the developer confirms drag and drop and folders by hand.
 - [ ] **M6 Settings.** The settings window (Command-Comma, and Settings in the Dock icon's menu, which M6 adds) with the hotkey recorder, grid size, the hidden apps list with Unhide, export and import with error alerts, and launch at login through `SMAppService`, re-registered at startup while the preference is on. Hide in the context menu.
   Done when: the developer confirms the settings by hand.
@@ -64,8 +64,16 @@ Handoff state:
   - A click on an app launches it and closes the overlay. A click between icons, Escape, switching apps, or switching Spaces closes it. The app you were in gets the focus back.
   - A two-finger swipe, a mouse wheel, the left and right arrow keys, and the page dots all change pages.
   - The overlay also opens over a full-screen app.
-- Left for M6: the Dock icon menu with Settings, and Hide in the context menu.
-- M5: built on 2026-11-16 and waiting for the developer's check by hand. 86 tests pass; the layout edits (`Layout.moveItem`, `dropApp`, `removeApp(fromFolder:)`, `moveApp(inFolder:)`, `renameFolder`) are in `MacStartCore` and tested. The agent did not launch the app, because the developer was at the screen.
+- M6: built on 2026-11-16 and waiting for the developer's check by hand. 90 tests pass. The agent did not launch the app, because the developer was at the screen. The first launch of this build saves the default preferences and registers launch at login, which can show a Background Items notification.
+- Developer's checks for M6:
+  - Command-Comma and Settings in the Dock icon's menu open the settings window, and the overlay closes.
+  - The shortcut recorder takes a new shortcut, which works at once and is still there after a restart. Escape cancels. A plain letter is refused with a message.
+  - Open at login registers MacStart in System Settings > General > Login Items, and turning it off removes it.
+  - Changing columns or rows reflows the grid at once.
+  - Right-click > Hide removes an app from the grid and search. Unhide in Settings puts it back at the end.
+  - Export writes a JSON file. Import of that file asks to confirm, then restores the layout and settings. Importing a file that is not a backup shows an alert and changes nothing.
+- When the developer accepts M6, every milestone is done. Then move any remaining facts from these notes into `docs/`, and delete this task folder with the developer's confirmation.
+- M5: built on 2026-11-16; the developer tested it by hand, reported two issues (folders could not be made, dropped icons jumped back), both fixed, and accepted it. 86 tests pass; the layout edits (`Layout.moveItem`, `dropApp`, `removeApp(fromFolder:)`, `moveApp(inFolder:)`, `renameFolder`) are in `MacStartCore` and tested. The agent did not launch the app, because the developer was at the screen.
 - Developer's checks for M5:
   - Dragging an icon makes the others shift live. The drop lands where the gap is, including on another page after resting at a screen edge.
   - Resting a dragged app on another app highlights it, and the drop makes a folder named after the app category. Dropping onto a folder adds the app.

@@ -11,6 +11,7 @@ struct OverlayActions {
     let renameFolder: @MainActor (UUID, String) -> Void
     let removeFromFolder: @MainActor (UUID, Int) -> Void
     let showInFinder: @MainActor (InstalledApp) -> Void
+    let hide: @MainActor (InstalledApp) -> Void
     let dragChanged: @MainActor (DragUpdate) -> Void
     let dragEnded: @MainActor () -> Void
 }

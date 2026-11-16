@@ -92,6 +92,18 @@ public struct HotKey: Hashable, Sendable, Codable {
     /// Option-S. `0x01` is `kVK_ANSI_S`.
     public static let `default` = HotKey(keyCode: 0x01, modifiers: [.option])
 
+    /// The virtual key codes of F1 to F20 (`kVK_F1` to `kVK_F20`).
+    public static let functionKeyCodes: Set<UInt16> = [
+        0x7A, 0x78, 0x63, 0x76, 0x60, 0x61, 0x62, 0x64, 0x65, 0x6D,
+        0x67, 0x6F, 0x69, 0x6B, 0x71, 0x6A, 0x40, 0x4F, 0x50, 0x5A,
+    ]
+
+    /// True when the shortcut can be global without taking a key away from typing: it uses Command, Option, or
+    /// Control, or it is a function key. Shift alone is not enough.
+    public var isUsableAsGlobalShortcut: Bool {
+        !modifiers.isDisjoint(with: [.command, .option, .control]) || Self.functionKeyCodes.contains(keyCode)
+    }
+
     /// The modifier keys of a shortcut.
     public struct Modifiers: OptionSet, Hashable, Sendable {
         public let rawValue: UInt8

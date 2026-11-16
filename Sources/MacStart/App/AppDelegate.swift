@@ -6,14 +6,30 @@ import MacStartCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = LogArea.overlay.logger
-    private let store = LayoutStore(
-        scanner: CatalogScanner(roots: CatalogScanner.standardRoots()),
-        fileStore: LayoutFileStore(fileURL: LayoutFileStore.standardFileURL),
-        preferences: PreferencesStore().load() ?? .default
-    )
-    private lazy var overlay = OverlayController(store: store, icons: IconProvider(), launcher: AppLauncher())
-    private var hotKey: GlobalHotKey?
+    /// True when no preferences were saved yet, which marks the first launch.
+    private let isFirstLaunch: Bool
+    private let store: LayoutStore
+    private let icons = IconProvider()
+    private lazy var overlay = OverlayController(store: store, icons: icons, launcher: AppLauncher())
+    private lazy var hotKey = GlobalHotKey { [weak self] in
+        self?.overlay.toggle()
+    }
+    private lazy var settings = SettingsModel(store: store, hotKey: hotKey, loginItem: LoginItem())
+    private lazy var settingsWindow = SettingsWindowController(model: settings, icons: icons)
     private var catalogWatcher: CatalogWatcher?
+
+    override init() {
+        let preferencesStore = PreferencesStore()
+        let savedPreferences = preferencesStore.load()
+        isFirstLaunch = savedPreferences == nil
+        store = LayoutStore(
+            scanner: CatalogScanner(roots: CatalogScanner.standardRoots()),
+            fileStore: LayoutFileStore(fileURL: LayoutFileStore.standardFileURL),
+            preferencesStore: preferencesStore,
+            preferences: savedPreferences ?? .default
+        )
+        super.init()
+    }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // A Dock icon, like Launchpad. Set in code because an executable started outside
@@ -24,7 +40,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("MacStart launched")
-        registerHotKey()
+        if isFirstLaunch {
+            store.savePreferences()
+        }
+        settings.registerSavedHotKey()
+        // Registers launch at login on the first launch, and again after an update changed the signature.
+        settings.applyLaunchAtLogin()
         catalogWatcher = CatalogWatcher(roots: CatalogScanner.standardRoots()) { [weak self] in
             guard let self else {
                 return
@@ -43,20 +64,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// The Dock icon's menu adds Settings.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "Settings…", action: #selector(openSettings(_:)), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        return menu
+    }
+
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         true
     }
 
-    private func registerHotKey() {
-        let hotKey = GlobalHotKey { [weak self] in
-            self?.overlay.toggle()
-        }
-        do {
-            try hotKey.register(store.preferences.hotKey)
-        } catch {
-            LogArea.hotkey.logger.error("Cannot register the hotkey: \(String(describing: error))")
-        }
-        self.hotKey = hotKey
+    /// Opens the settings window, from the app menu (Command-Comma) or the Dock icon's menu.
+    @objc func openSettings(_ sender: Any?) {
+        overlay.hide(restoringFocus: false)
+        settingsWindow.show()
     }
 
     /// True when macOS started the app at login. The overlay then stays hidden until the user opens it.

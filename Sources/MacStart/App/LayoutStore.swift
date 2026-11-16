@@ -18,15 +18,22 @@ final class LayoutStore {
 
     @ObservationIgnored private let scanner: CatalogScanner
     @ObservationIgnored private let fileStore: LayoutFileStore
+    @ObservationIgnored private let preferencesStore: PreferencesStore
     @ObservationIgnored private let writer: LayoutWriter
     @ObservationIgnored private var isScanning = false
     @ObservationIgnored private var isScanPending = false
     @ObservationIgnored private var revision = 0
     @ObservationIgnored private let logger = LogArea.layout.logger
 
-    init(scanner: CatalogScanner, fileStore: LayoutFileStore, preferences: Preferences) {
+    init(
+        scanner: CatalogScanner,
+        fileStore: LayoutFileStore,
+        preferencesStore: PreferencesStore,
+        preferences: Preferences
+    ) {
         self.scanner = scanner
         self.fileStore = fileStore
+        self.preferencesStore = preferencesStore
         self.preferences = preferences
         writer = LayoutWriter(fileStore: fileStore)
     }
@@ -84,6 +91,57 @@ final class LayoutStore {
     /// Reorders an app inside its folder.
     func moveApp(inFolder id: UUID, from index: Int, to destination: Int) {
         edit { $0.moveApp(inFolder: id, from: index, to: destination) }
+    }
+
+    /// Hides an app from the grid and from search.
+    func hide(_ id: AppID) {
+        edit { $0.hide(id) }
+    }
+
+    /// Shows a hidden app again, at the end of the last page.
+    func unhide(_ id: AppID) {
+        edit { $0.unhide(id) }
+    }
+
+    // MARK: - Preferences, export, and import
+
+    /// Changes and saves the preferences. A new grid size reflows the pages at once.
+    func updatePreferences(_ change: (inout Preferences) -> Void) {
+        var updated = preferences
+        change(&updated)
+        guard updated != preferences else {
+            return
+        }
+        let capacityChanged = updated.pageCapacity != preferences.pageCapacity
+        preferences = updated
+        savePreferences()
+        if capacityChanged {
+            edit { _ in }
+        }
+    }
+
+    /// The current layout and preferences, ready to write to an export file.
+    func makeExport() -> Export {
+        Export.snapshot(layout: layout, preferences: preferences)
+    }
+
+    /// Replaces the layout and the preferences with an import. Apps missing on this Mac leave the grid but stay
+    /// hidden when they were hidden.
+    func applyImport(_ export: Export) {
+        preferences = export.preferences
+        savePreferences()
+        layout = export.layout.reconciled(with: catalog, pageCapacity: preferences.pageCapacity)
+        save()
+        logger.info("Imported a layout with \(self.layout.placedAppIDs.count) placed apps")
+    }
+
+    /// Writes the preferences to `UserDefaults`.
+    func savePreferences() {
+        do {
+            try preferencesStore.save(preferences)
+        } catch {
+            logger.error("Cannot save the preferences: \(String(describing: error))")
+        }
     }
 
     func renameFolder(_ id: UUID, to name: String) {

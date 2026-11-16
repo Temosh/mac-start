@@ -41,18 +41,18 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 
 ## Settings Window
 
-Opened with `⌘,` while MacStart is active, or with Settings in the Dock icon menu.
+Opened with `⌘,` while MacStart is active, or with Settings in the Dock icon menu. Opening it closes the overlay. `⌘W` closes it.
 
-- Hotkey recorder (default `⌥S`).
-- Grid columns and rows (default 7 × 5).
-- Hidden apps list with an Unhide button for each.
-- Export and Import buttons, which use the standard save and open panels. An export covers the layout and every preference.
-- Launch at login toggle (on by default).
+- **Shortcut** (default `⌥S`): click the recorder, then press the new shortcut; Escape cancels. A shortcut needs Command, Option, or Control, unless it is a function key. When another app already owns it, a message says so and the old shortcut stays.
+- **Open at login** (on by default). When macOS needs the user to allow it, a message and an Open Login Items button appear.
+- **Grid**: columns (3–15) and rows (2–10), default 7 × 5. A change reflows the pages at once.
+- **Hidden Apps**: each hidden app with an Unhide button. Unhidden apps go to the end of the last page. Uninstalled hidden apps show "Not installed".
+- **Backup**: Export and Import buttons with the standard save and open panels. An export covers the layout and every preference, named `MacStart Backup YYYY-MM-DD.json`. An import asks to confirm before it replaces anything.
 
 ## States
 
 - **Empty catalog:** one empty page with a short message. This should never happen in practice.
-- **Import failure:** an alert with the reason, and the layout and preferences are left unchanged.
+- **Import failure:** an alert with the reason, and the layout and preferences are left unchanged. A newer format asks the user to update MacStart; a file that is not a backup is called damaged or not a MacStart backup.
 - **App launch failure:** an alert with the app name and the underlying reason.
 
 ## Accessibility

@@ -206,4 +206,25 @@ struct LayoutEditingTests {
         #expect(Folder.defaultName(target: plain, dropped: game) == "Games")
         #expect(Folder.defaultName(target: plain, dropped: plain) == "Folder")
     }
+
+    @Test func hidingTakesAnAppOutOfItsFolderOnReconcile() {
+        let folder = Folder(name: "Pair", apps: [a, b])
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(c)])])
+
+        layout.hide(b)
+        let result = layout.reconciled(with: catalog(a, b, c), pageCapacity: capacity)
+
+        #expect(result.pages == [Page(items: [.app(a), .app(c)])])
+        #expect(result.hidden == [b])
+    }
+
+    @Test func unhidingAppendsTheAppToTheLastPageOnReconcile() {
+        var layout = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(c)])], hidden: [b])
+
+        layout.unhide(b)
+        let result = layout.reconciled(with: catalog(a, b, c), pageCapacity: capacity)
+
+        #expect(result.pages == [Page(items: [.app(a)]), Page(items: [.app(c), .app(b)])])
+        #expect(result.hidden.isEmpty)
+    }
 }

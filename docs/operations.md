@@ -66,4 +66,4 @@ xattr -dr com.apple.quarantine /Applications/MacStart.app
 
 The layout and preferences live outside the bundle (see [stack.md](../.agents/rules/stack.md#persistence)), so they survive the update.
 
-Each ad hoc signed build has a new code signature. Check after the first update whether macOS keeps the launch-at-login registration. If it does not, MacStart should re-register at startup whenever the preference is on.
+Each ad hoc signed build has a new code signature, which can invalidate the launch-at-login registration. MacStart checks the registration at every launch and registers again while the preference is on. macOS may show a Background Items notification when it does.
