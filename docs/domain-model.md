@@ -17,8 +17,8 @@ erDiagram
 | Entity | Fields | Notes |
 |--------|--------|-------|
 | `AppID` | standardized bundle path + bundle identifier (if any) | The identity used everywhere in the layout. Two IDs are equal when their paths are equal, so every bundle on disk is a separate app. The bundle identifier lets reconcile follow an app that moved. |
-| `App` | id, display name, version, bundle URL | Comes from the catalog and is never persisted. The display name is the localized name Finder shows. The version is `CFBundleShortVersionString`. For an app found through a symbolic link, the bundle URL is the link's target, used for icons and launching. The icon is loaded on demand. |
-| `Catalog` | set of `App` keyed by `AppID` | Rebuilt by scanning the app locations, see [Catalog Scan](#catalog-scan). |
+| `InstalledApp` | id, display name, version, bundle URL | Comes from the catalog and is never persisted. The display name is the localized name Finder shows. The version is `CFBundleShortVersionString`. For an app found through a symbolic link, the bundle URL is the link's target, used for icons and launching. The icon is loaded on demand. |
+| `Catalog` | set of `InstalledApp` keyed by `AppID` | Rebuilt by scanning the app locations, see [Catalog Scan](#catalog-scan). |
 | `Folder` | stable UUID, name, ordered `[AppID]` | |
 | `Item` | `.app(AppID)` or `.folder(Folder)` | |
 | `Page` | ordered `[Item]` | Holds at most rows × columns items. |

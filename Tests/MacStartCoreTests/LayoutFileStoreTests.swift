@@ -60,6 +60,21 @@ struct LayoutFileStoreTests {
         }
     }
 
+    @Test func movesAnUnreadableFileAside() throws {
+        try withTemporaryDirectory { directory in
+            let fileURL = directory.appending(path: "layout.json")
+            try Data("not a layout".utf8).write(to: fileURL)
+            let store = LayoutFileStore(fileURL: fileURL)
+
+            let moved = try store.moveUnreadableFileAside(at: Date(timeIntervalSince1970: 1_794_830_400))
+
+            #expect(moved.lastPathComponent == "layout.unreadable-20261116T120000Z.json")
+            #expect(try String(contentsOf: moved, encoding: .utf8) == "not a layout")
+            let loaded = try store.load()
+            #expect(loaded == nil)
+        }
+    }
+
     @Test func standardFileIsInApplicationSupport() {
         #expect(
             LayoutFileStore.standardFileURL.path(percentEncoded: false).hasSuffix(

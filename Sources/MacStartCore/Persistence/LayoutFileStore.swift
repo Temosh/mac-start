@@ -35,6 +35,20 @@ public struct LayoutFileStore: Sendable {
             at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: fileURL, options: .atomic)
     }
+
+    /// Renames an unreadable file to `layout.unreadable-<UTC time>.json` in the same folder, so the next save
+    /// does not overwrite it, for example a file from a newer MacStart. Returns the new location.
+    public func moveUnreadableFileAside(at date: Date = .now) throws -> URL {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime, .withTimeZone]
+        let name = fileURL.deletingPathExtension().lastPathComponent
+        let destination = fileURL.deletingLastPathComponent().appending(
+            path: "\(name).unreadable-\(formatter.string(from: date)).\(fileURL.pathExtension)",
+            directoryHint: .notDirectory
+        )
+        try FileManager.default.moveItem(at: fileURL, to: destination)
+        return destination
+    }
 }
 
 /// The content of `layout.json`.

@@ -24,20 +24,20 @@ Package.swift
 .swift-format              swift format configuration; owns the code style
 Sources/
   MacStartCore/            Library. Foundation only: no AppKit, no SwiftUI.
-    Model/                 AppID, App, Catalog, Folder, Item, Page, Layout, Preferences
+    Model/                 AppID, InstalledApp, Catalog, Folder, Item, Page, Layout, Preferences
     Reconcile/             Pure reconcile and invariant checks
     Catalog/               App bundle scanning (FileManager + Bundle)
     Persistence/           JSON format, layout.json store, preferences store, export/import
     LogArea.swift          Logger categories shared by both modules
   MacStart/                Executable. App entry and everything AppKit/SwiftUI.
-    App/                   Entry point, AppDelegate, dependency wiring
+    App/                   Entry point, AppDelegate, dependency wiring, LayoutStore
     Overlay/               Overlay window and controller, show/hide, display choice
     Features/
       Grid/                Pages, icons, paging, drag and drop
       Folders/             Folder open/close, rename
       Search/              Type-to-search, keyboard navigation
       Settings/            Hotkey, grid size, launch at login, hidden apps, export/import
-    Platform/              Thin adapters: HotKey, CatalogWatcher, IconProvider,
+    Platform/              Thin adapters: GlobalHotKey, CatalogWatcher, IconProvider,
                            AppLauncher, LoginItem
 Tests/
   MacStartCoreTests/       Swift Testing; reconcile, codec, catalog scan fixtures
@@ -65,12 +65,14 @@ These folders are the agreed layout. They are created as the code is written.
 | Concern | Choice | Reason |
 |---------|--------|--------|
 | Global hotkey | Carbon `RegisterEventHotKey` | Works without Accessibility permission |
-| Overlay window | Borderless `NSPanel` hosting SwiftUI through `NSHostingView`, placed above the Dock and menu bar, joining the active Space | Covers the whole screen like Launchpad |
+| Overlay window | Borderless, non-activating `NSPanel` hosting SwiftUI through `NSHostingView`, at window level `statusBar + 1` (above the Dock and menu bar, below pop-up menus), joining the active Space and full-screen Spaces | Covers the whole screen like Launchpad, while context menus still appear on top |
+| Focus | The panel takes keyboard focus without activating MacStart. When MacStart was active, as after a Dock click, hiding the overlay activates the previously active app | The app the user was in stays active underneath |
+| Show and hide animation | The content view's layer fades with an explicit Core Animation fade, after its final opacity is set; SwiftUI scales the content | `NSWindow.animator()` alpha can stall at its start value, for example while the display sleeps, which would leave an invisible overlay |
 | Target display | `NSScreen.screens.first`, the display that holds the menu bar | `NSScreen.main` follows keyboard focus, which is not the main display |
 | Background | `NSVisualEffectView` blur behind the grid | Native look like Launchpad |
-| App discovery | Scan `/Applications`, `/System/Applications`, `~/Applications` recursively (skipping into `.app` bundles), plus FSEvents watching on those roots, debounced | One code path handles the full scan and later updates, which keeps the list free of duplicates |
+| App discovery | Scan `/Applications`, `/System/Applications`, `~/Applications` recursively (skipping into `.app` bundles), plus FSEvents watching on those roots, debounced by a 2-second FSEvents latency | One code path handles the full scan and later updates, which keeps the list free of duplicates |
 | Launching | `NSWorkspace.openApplication(at:configuration:)` | |
-| Icons | `NSWorkspace.icon(forFile:)`, cached by `AppID` in memory | |
+| Icons | `NSWorkspace.icon(forFile:)` on the bundle URL, cached in memory by path and version | An updated app gets its new icon |
 | Layout storage | `~/Library/Application Support/MacStart/layout.json`, written atomically | Human-readable, and uses the same format as export |
 | Preferences | `Preferences` value in `MacStartCore`, stored in `UserDefaults` | Small settings, included in export |
 | Dock icon | `applicationShouldHandleReopen` toggles the overlay; `applicationDockMenu` adds Settings | Same entry point as Launchpad |

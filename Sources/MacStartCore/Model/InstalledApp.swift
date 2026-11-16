@@ -1,7 +1,7 @@
 import Foundation
 
 /// An installed app, as the catalog scan found it. Never persisted: the layout stores only `AppID`s.
-public struct App: Hashable, Sendable, Identifiable {
+public struct InstalledApp: Hashable, Sendable, Identifiable {
     public let id: AppID
     /// The name Finder shows for the app, localized and without the `.app` extension.
     public let displayName: String
@@ -19,7 +19,7 @@ public struct App: Hashable, Sendable, Identifiable {
     }
 
     /// Finder-like order by display name. Ties are broken by path, so the order is always the same.
-    static func displayOrder(_ lhs: App, _ rhs: App) -> Bool {
+    static func displayOrder(_ lhs: InstalledApp, _ rhs: InstalledApp) -> Bool {
         switch lhs.displayName.localizedStandardCompare(rhs.displayName) {
         case .orderedAscending: true
         case .orderedDescending: false

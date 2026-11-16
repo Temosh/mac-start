@@ -13,7 +13,7 @@
 - `build/` and `*.app` are git-ignored.
 - Formatting and linting use the `swift format` bundled with the toolchain. The `.swift-format` file at the repository root owns the style: 4-space indentation, 120-column lines, and the default rules otherwise.
 - CI: GitHub Actions (`.github/workflows/build.yml`) on the `xcode-27` runner with Xcode 27.2 selected. It builds, tests, packages, and publishes the zipped app. Details: `docs/operations.md`.
-- "Done" means `swift build`, `swift test`, and `scripts/build-app.sh` all succeed locally, and CI is green.
+- "Done" means `swift build`, `swift test`, and `scripts/build-app.sh` all succeed locally. CI runs only when the developer pushes, and it is not part of "done".
 - `scripts/build-app.sh` must run unattended, without prompts or GUI tools, so the same script works locally and in CI.
 
 ## Frameworks

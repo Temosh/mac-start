@@ -48,7 +48,7 @@ private struct Scenario {
     }
 
     static func random(using random: inout SplitMix64) -> Scenario {
-        var installed: [App] = []
+        var installed: [InstalledApp] = []
         for id in pool where Bool.random(using: &random) {
             installed.append(app(id))
         }

@@ -35,7 +35,7 @@ public struct CatalogScanner: Sendable {
         let ordered = candidates.sorted { ($0.isSymbolicLink ? 1 : 0, $0.path) < ($1.isSymbolicLink ? 1 : 0, $1.path) }
 
         var seenBundlePaths = Set<String>()
-        var apps: [App] = []
+        var apps: [InstalledApp] = []
         for candidate in ordered where seenBundlePaths.insert(candidate.bundleURL.standardizedFilePath).inserted {
             if let app = Self.app(from: candidate) {
                 apps.append(app)
@@ -118,7 +118,7 @@ public struct CatalogScanner: Sendable {
     }
 
     /// The app for a candidate, or nil when the bundle has no `Info.plist` and so cannot be launched.
-    private static func app(from candidate: BundleCandidate) -> App? {
+    private static func app(from candidate: BundleCandidate) -> InstalledApp? {
         // Reads the bundle's Info.plist fresh on every scan, unlike `Bundle`, which caches it for the
         // life of the process. Wrapped iOS apps are read through their `WrappedBundle` link.
         guard
@@ -129,7 +129,7 @@ public struct CatalogScanner: Sendable {
             return nil
         }
         let bundleIdentifier = (info["CFBundleIdentifier"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-        return App(
+        return InstalledApp(
             id: AppID(path: candidate.path, bundleIdentifier: bundleIdentifier),
             displayName: displayName(atPath: candidate.path),
             version: info["CFBundleShortVersionString"] as? String,

@@ -24,7 +24,8 @@ extension Layout {
         }
         let hidden = Set(collapsed.hidden.map { match.resolved[$0] ?? $0 })
 
-        let newApps = catalog.apps.filter { !match.matchedCatalogIDs.contains($0.id) }.sorted(by: App.displayOrder)
+        let newApps = catalog.apps.filter { !match.matchedCatalogIDs.contains($0.id) }.sorted(
+            by: InstalledApp.displayOrder)
         if pages.isEmpty {
             pages = [Page()]
         }

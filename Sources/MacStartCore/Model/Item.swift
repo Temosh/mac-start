@@ -12,6 +12,16 @@ public enum Item: Hashable, Sendable {
     }
 }
 
+extension Item: Identifiable {
+    /// Stays the same when the item moves: the app's path, or the folder's identifier.
+    public var id: String {
+        switch self {
+        case .app(let appID): "app:\(appID.path)"
+        case .folder(let folder): "folder:\(folder.id.uuidString)"
+        }
+    }
+}
+
 extension Item: Codable {
     // Encoded as a single-key object, `{"app": {...}}` or `{"folder": {...}}`, so files stay readable.
     private enum CodingKeys: String, CodingKey {

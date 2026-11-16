@@ -7,8 +7,9 @@ func appID(_ name: String, in folder: String = "/Applications") -> AppID {
 }
 
 /// A catalog app for `id`, named after its file.
-func app(_ id: AppID, version: String? = nil) -> App {
-    App(id: id, displayName: URL(filePath: id.path).deletingPathExtension().lastPathComponent, version: version)
+func app(_ id: AppID, version: String? = nil) -> InstalledApp {
+    InstalledApp(
+        id: id, displayName: URL(filePath: id.path).deletingPathExtension().lastPathComponent, version: version)
 }
 
 /// A catalog with one app per ID.

@@ -8,6 +8,7 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 - It appears on the current Space, even over fullscreen apps.
 - The background is a blurred view of the desktop.
 - Showing and hiding use a short fade and scale animation. When Reduce Motion is on, it switches with no animation.
+- Opening the app from Finder, or from the Dock while it is not running, shows the overlay. A launch at login keeps it hidden until the hotkey or the Dock icon opens it.
 
 ## Layout
 
