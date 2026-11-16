@@ -74,11 +74,14 @@ struct PageView: View {
                     actions: actions
                 )
                 .frame(width: metrics.cellSize.width, height: metrics.cellSize.height)
-                // The dragged tile stays in place, invisible, because its gesture lives on it. A tile pushed past
-                // the last slot is hidden until the drop moves it to the next page.
-                .opacity(entry.isDragged || entry.displaySlot >= metrics.pageCapacity ? 0 : 1)
-                .position(metrics.center(ofSlot: entry.displaySlot))
+                // The dragged tile stays invisible under the dragged copy, because its gesture lives on it. When the
+                // drop shows it again, it appears right where the copy was and glides into its slot from there.
+                .opacity(entry.isHidden ? 0 : 1)
+                .animation(nil, value: entry.isDragged)
+                .scaleEffect(entry.isDragged ? 1.08 : 1)
+                .position(entry.position)
                 .animation(.easeInOut(duration: 0.2), value: entry.displaySlot)
+                .animation(.easeOut(duration: 0.2), value: entry.isDragged)
             }
         }
     }
@@ -91,12 +94,25 @@ struct PageView: View {
         let displaySlot: Int
         let isDragged: Bool
         let isFolderTarget: Bool
+        /// Where the tile's center shows: its display slot, or under the dragged copy while it is dragged.
+        let position: CGPoint
+        /// True for the dragged tile, and for a tile pushed past the last slot until the drop moves it to the next
+        /// page.
+        let isHidden: Bool
     }
 
     private var entries: [Entry] {
         guard let pageIndex, let drag else {
             return items.enumerated().map { slot, item in
-                Entry(item: item, slot: slot, displaySlot: slot, isDragged: false, isFolderTarget: false)
+                Entry(
+                    item: item,
+                    slot: slot,
+                    displaySlot: slot,
+                    isDragged: false,
+                    isFolderTarget: false,
+                    position: metrics.center(ofSlot: slot),
+                    isHidden: false
+                )
             }
         }
         var draggedSlot: Int?
@@ -112,7 +128,19 @@ struct PageView: View {
         var visibleIndex = 0
         for (slot, item) in items.enumerated() {
             if slot == draggedSlot {
-                result.append(Entry(item: item, slot: slot, displaySlot: slot, isDragged: true, isFolderTarget: false))
+                // Only on the page under the drag does the overlay's coordinate space match this page's.
+                let position = drag.page == pageIndex ? drag.tileCenter : metrics.center(ofSlot: slot)
+                result.append(
+                    Entry(
+                        item: item,
+                        slot: slot,
+                        displaySlot: slot,
+                        isDragged: true,
+                        isFolderTarget: false,
+                        position: position,
+                        isHidden: true
+                    )
+                )
                 continue
             }
             let displaySlot = gapSlot.map { visibleIndex >= $0 ? visibleIndex + 1 : visibleIndex } ?? visibleIndex
@@ -122,7 +150,9 @@ struct PageView: View {
                     slot: slot,
                     displaySlot: displaySlot,
                     isDragged: false,
-                    isFolderTarget: visibleIndex == folderTargetSlot
+                    isFolderTarget: visibleIndex == folderTargetSlot,
+                    position: metrics.center(ofSlot: displaySlot),
+                    isHidden: displaySlot >= metrics.pageCapacity
                 )
             )
             visibleIndex += 1

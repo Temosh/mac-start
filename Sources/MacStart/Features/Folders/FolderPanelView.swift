@@ -69,7 +69,7 @@ struct FolderPanelView: View {
                 .accessibilityLabel("Folder name")
                 .frame(width: metrics.frame.width - 2 * FolderPanelMetrics.padding)
                 .position(metrics.titleCenter)
-            ForEach(entries, id: \.index) { entry in
+            ForEach(entries, id: \.app.id) { entry in
                 GridItemView(
                     item: .app(entry.app.id),
                     isSelected: entry.index == state.folderSelection,
@@ -85,9 +85,13 @@ struct FolderPanelView: View {
                     actions: actions
                 )
                 .frame(width: metrics.cellSize.width, height: metrics.cellSize.height)
+                // As in the grid: the dragged tile hides under the dragged copy and glides into place from there.
                 .opacity(entry.isDragged ? 0 : 1)
-                .position(metrics.center(ofSlot: entry.displaySlot))
+                .animation(nil, value: entry.isDragged)
+                .scaleEffect(entry.isDragged ? 1.08 : 1)
+                .position(entry.position)
                 .animation(.easeInOut(duration: 0.2), value: entry.displaySlot)
+                .animation(.easeOut(duration: 0.2), value: entry.isDragged)
             }
         }
         .opacity(isVisible ? 1 : 0)
@@ -117,15 +121,19 @@ struct FolderPanelView: View {
         let app: InstalledApp
         let displaySlot: Int
         let isDragged: Bool
+        /// Where the tile's center shows: its display slot, or under the dragged copy while it is dragged.
+        let position: CGPoint
     }
 
     /// The folder's apps, making room where a dragged app would land.
     private var entries: [Entry] {
         var draggedIndex: Int?
         var gapIndex: Int?
+        var draggedCenter: CGPoint?
         if let drag = state.drag, case .inFolder(folder.id, let index) = drag.source {
             draggedIndex = index
             gapIndex = drag.folderGapIndex
+            draggedCenter = drag.tileCenter
         }
         var result: [Entry] = []
         var visibleIndex = 0
@@ -134,11 +142,20 @@ struct FolderPanelView: View {
                 continue
             }
             if index == draggedIndex {
-                result.append(Entry(index: index, app: app, displaySlot: index, isDragged: true))
+                let position = draggedCenter ?? metrics.center(ofSlot: index)
+                result.append(Entry(index: index, app: app, displaySlot: index, isDragged: true, position: position))
                 continue
             }
             let displaySlot = gapIndex.map { visibleIndex >= $0 ? visibleIndex + 1 : visibleIndex } ?? visibleIndex
-            result.append(Entry(index: index, app: app, displaySlot: displaySlot, isDragged: false))
+            result.append(
+                Entry(
+                    index: index,
+                    app: app,
+                    displaySlot: displaySlot,
+                    isDragged: false,
+                    position: metrics.center(ofSlot: displaySlot)
+                )
+            )
             visibleIndex += 1
         }
         return result
