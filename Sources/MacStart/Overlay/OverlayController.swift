@@ -20,6 +20,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
     /// Bumped on every show and hide, so a hide that finishes late cannot close a panel shown again meanwhile.
     private var visibilityGeneration = 0
     private var scrollMonitor: Any?
+    private var keyMonitor: Any?
     private var lastWheelPageTurn = Date.distantPast
     /// The last app other than MacStart that was active. It gets the focus back when the overlay closes while
     /// MacStart is active, for example after a click on the Dock icon.
@@ -76,7 +77,8 @@ final class OverlayController: NSObject, NSWindowDelegate {
         panel.makeKeyAndOrderFront(nil)
         state.isPresented = true
         fadeContent(toVisible: true)
-        installScrollMonitor()
+        installEventMonitors()
+        state.searchFocusRequest += 1
         logger.debug(
             "Overlay shown, frame \(NSStringFromRect(self.panel.frame), privacy: .public), screen \(NSStringFromRect(screen.frame), privacy: .public)"
         )
@@ -88,7 +90,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             return
         }
         state.isPresented = false
-        removeScrollMonitor()
+        removeEventMonitors()
         visibilityGeneration += 1
         let generation = visibilityGeneration
 
@@ -109,6 +111,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             return
         }
         panel.orderOut(nil)
+        state.reset()
         logger.debug("Overlay ordered out")
         if restoringFocus, NSApp.isActive {
             previousApp?.activate()
@@ -175,21 +178,130 @@ final class OverlayController: NSObject, NSWindowDelegate {
 
     // MARK: - Input
 
-    private func handleKeyDown(_ event: NSEvent) -> Bool {
-        switch Int(event.keyCode) {
-        case kVK_Escape:
-            hide()
-            return true
-        case kVK_LeftArrow:
-            turnPage(by: -1)
-            return true
-        case kVK_RightArrow:
-            turnPage(by: 1)
-            return true
-        default:
-            // Swallow other plain keys so the panel does not beep. Command shortcuts go on to the menus.
-            return !event.modifierFlags.contains(.command)
+    /// Watches the keyboard and the mouse wheel while the overlay is open. Local monitors see key presses
+    /// before the search field does, so the arrow keys, Return, and Escape act on the grid even while the field
+    /// has the focus. Every other key goes on to the field.
+    private func installEventMonitors() {
+        if keyMonitor == nil {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                let keyCode = Int(event.keyCode)
+                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                    .subtracting([.function, .numericPad, .capsLock])
+                // Local monitors run on the main thread.
+                let isHandled = MainActor.assumeIsolated {
+                    self?.handleKey(keyCode: keyCode, hasModifiers: !modifiers.isEmpty) ?? false
+                }
+                return isHandled ? nil : event
+            }
         }
+        installScrollMonitor()
+    }
+
+    private func removeEventMonitors() {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            self.keyMonitor = nil
+        }
+        removeScrollMonitor()
+    }
+
+    /// Handles a key press that the search field must not get. Returns true when the key was used.
+    private func handleKey(keyCode: Int, hasModifiers: Bool) -> Bool {
+        // While an input method composes text, its keys belong to the input method.
+        guard panel.isKeyWindow, !hasModifiers, !isComposingText else {
+            return false
+        }
+        switch keyCode {
+        case kVK_Escape:
+            clearSearchOrHide()
+        case kVK_Return, kVK_ANSI_KeypadEnter:
+            activateSelection()
+        case kVK_LeftArrow:
+            moveSelection(.left)
+        case kVK_RightArrow:
+            moveSelection(.right)
+        case kVK_UpArrow:
+            moveSelection(.up)
+        case kVK_DownArrow:
+            moveSelection(.down)
+        default:
+            return false
+        }
+        return true
+    }
+
+    private var isComposingText: Bool {
+        (panel.firstResponder as? NSTextView)?.hasMarkedText() ?? false
+    }
+
+    /// Escape clears the search first, and closes the overlay when there is nothing to clear.
+    private func clearSearchOrHide() {
+        if state.query.isEmpty {
+            hide()
+        } else {
+            state.query = ""
+        }
+    }
+
+    /// Moves the keyboard selection through the search results, or through the pages of the grid.
+    private func moveSelection(_ direction: GridDirection) {
+        let itemCounts =
+            state.isSearching
+            ? [store.searchResults(matching: state.query).count] : store.layout.pages.map(\.items.count)
+        let page = state.isSearching ? 0 : (state.currentPage ?? 0)
+        let navigation = GridNavigation(columns: store.preferences.gridColumns, itemCounts: itemCounts)
+        guard let next = navigation.position(after: direction, from: state.selection, onPage: page) else {
+            return
+        }
+        state.selection = next
+        if !state.isSearching, next.page != page {
+            showPage(next.page)
+        }
+    }
+
+    /// Return launches the selected app. While searching, it launches the best result when nothing is selected.
+    private func activateSelection() {
+        if state.isSearching {
+            let results = store.searchResults(matching: state.query)
+            let slot = state.selection?.slot ?? 0
+            if results.indices.contains(slot) {
+                launch(results[slot])
+            }
+            return
+        }
+        guard
+            let selection = state.selection,
+            selection.page == state.currentPage,
+            store.layout.pages.indices.contains(selection.page)
+        else {
+            return
+        }
+        let items = store.layout.pages[selection.page].items
+        // A selected folder does nothing until folders can be opened.
+        guard
+            items.indices.contains(selection.slot),
+            case .app(let id) = items[selection.slot],
+            let app = store.app(for: id)
+        else {
+            return
+        }
+        launch(app)
+    }
+
+    /// Takes a key press that reached the panel itself, which happens when the search field lost the focus.
+    /// Typed text goes to the search, and the field gets the focus back. Returns true when the key was used.
+    private func handleUnfocusedKey(_ event: NSEvent) -> Bool {
+        guard !event.modifierFlags.contains(.command) else {
+            return false
+        }
+        if let characters = event.characters,
+            characters.contains(where: { $0.isLetter || $0.isNumber || $0.isPunctuation || $0.isSymbol })
+        {
+            state.query += characters
+            state.searchFocusRequest += 1
+        }
+        // Other plain keys are swallowed, so the panel does not beep.
+        return true
     }
 
     /// Turns pages with a mouse wheel. Trackpads and the Magic Mouse scroll precisely, and the paged scroll view
@@ -268,7 +380,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         let panel = OverlayPanel(contentRect: NSScreen.screens.first?.frame ?? .zero)
         panel.delegate = self
         panel.onKeyDown = { [weak self] event in
-            self?.handleKeyDown(event) ?? false
+            self?.handleUnfocusedKey(event) ?? false
         }
         let actions = OverlayActions(
             launch: { [weak self] app in self?.launch(app) },

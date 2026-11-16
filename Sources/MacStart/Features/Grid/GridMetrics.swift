@@ -9,6 +9,8 @@ struct GridMetrics: Equatable {
     let cellSize: CGSize
     let iconSize: CGFloat
     let labelFontSize: CGFloat
+    /// The height above the grid, where the search field sits.
+    let topInset: CGFloat
     /// The height below the grid, where the page dots sit.
     let bottomInset: CGFloat
 
@@ -16,8 +18,7 @@ struct GridMetrics: Equatable {
         self.columns = max(columns, 1)
         self.rows = max(rows, 1)
         let horizontalInset = overlaySize.width * 0.07
-        // The space above the grid is kept for the search field.
-        let topInset = max(overlaySize.height * 0.11, 72)
+        topInset = max(overlaySize.height * 0.11, 72)
         bottomInset = max(overlaySize.height * 0.09, 64)
         gridFrame = CGRect(
             x: horizontalInset,

@@ -75,6 +75,11 @@ The catalog holds every `.app` bundle with an `Info.plist` under `/Applications`
 
 Search matches only placed apps, including apps inside folders. Hidden apps never appear in results.
 
+- The query and the display names are compared without case, diacritics, or width differences, and split into words at anything that is not a letter or a digit.
+- An app matches when every word of the query appears in its name.
+- Results are ranked: first, names that start with the first query word while every other word starts a word of the name; then names where every query word starts a word; then names that only contain the words. Within a rank, names keep Finder order.
+- The overlay shows at most one page of results.
+
 ## Export And Import Format
 
 - A single UTF-8 JSON file, extension `.json`, holding the full `Export`: `schemaVersion`, `exportedAt` (ISO 8601, UTC), `layout`, and `preferences`. The goal is a complete migration to a new Mac with one import.

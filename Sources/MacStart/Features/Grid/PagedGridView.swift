@@ -5,6 +5,7 @@ import SwiftUI
 struct PagedGridView: View {
     let pages: [Page]
     @Binding var currentPage: Int?
+    let selection: GridPosition?
     let metrics: GridMetrics
     let store: LayoutStore
     let icons: IconProvider
@@ -14,9 +15,16 @@ struct PagedGridView: View {
         ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
                 ForEach(pages.indices, id: \.self) { index in
-                    PageView(items: pages[index].items, metrics: metrics, store: store, icons: icons, actions: actions)
-                        .containerRelativeFrame([.horizontal, .vertical])
-                        .id(index)
+                    PageView(
+                        items: pages[index].items,
+                        selectedSlot: selection?.page == index ? selection?.slot : nil,
+                        metrics: metrics,
+                        store: store,
+                        icons: icons,
+                        actions: actions
+                    )
+                    .containerRelativeFrame([.horizontal, .vertical])
+                    .id(index)
                 }
             }
             .scrollTargetLayout()
@@ -27,9 +35,11 @@ struct PagedGridView: View {
     }
 }
 
-/// One page of the grid. A click between items closes the overlay.
+/// One page of the grid, or the search results. A click between items closes the overlay.
 struct PageView: View {
     let items: [Item]
+    /// The keyboard selection on this page.
+    let selectedSlot: Int?
     let metrics: GridMetrics
     let store: LayoutStore
     let icons: IconProvider
@@ -41,9 +51,16 @@ struct PageView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { actions.dismiss() }
             ForEach(Array(items.enumerated()), id: \.element.id) { slot, item in
-                GridItemView(item: item, metrics: metrics, store: store, icons: icons, actions: actions)
-                    .frame(width: metrics.cellSize.width, height: metrics.cellSize.height)
-                    .position(metrics.center(ofSlot: slot))
+                GridItemView(
+                    item: item,
+                    isSelected: slot == selectedSlot,
+                    metrics: metrics,
+                    store: store,
+                    icons: icons,
+                    actions: actions
+                )
+                .frame(width: metrics.cellSize.width, height: metrics.cellSize.height)
+                .position(metrics.center(ofSlot: slot))
             }
         }
     }
@@ -53,13 +70,14 @@ struct PageView: View {
 struct PageIndicator: View {
     let pageCount: Int
     let currentPage: Int
+    let isHighContrast: Bool
     let select: (Int) -> Void
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(0..<pageCount, id: \.self) { page in
                 Circle()
-                    .fill(page == currentPage ? Color.white : Color.white.opacity(0.35))
+                    .fill(page == currentPage ? Color.white : Color.white.opacity(isHighContrast ? 0.6 : 0.35))
                     .frame(width: 8, height: 8)
                     .padding(5)
                     .contentShape(Circle())

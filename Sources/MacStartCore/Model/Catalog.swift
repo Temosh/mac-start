@@ -31,4 +31,15 @@ public struct Catalog: Hashable, Sendable {
     public func contains(_ id: AppID) -> Bool {
         appsByID[id] != nil
     }
+
+    /// Display names that more than one installed app uses. The grid shows the version under these names, so
+    /// the apps can be told apart.
+    public var sharedDisplayNames: Set<String> {
+        var seen = Set<String>()
+        var shared = Set<String>()
+        for app in appsByID.values where !seen.insert(app.displayName).inserted {
+            shared.insert(app.displayName)
+        }
+        return shared
+    }
 }

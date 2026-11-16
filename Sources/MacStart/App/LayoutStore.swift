@@ -13,6 +13,8 @@ final class LayoutStore {
     private(set) var preferences: Preferences
     /// False until the first catalog scan is reconciled, so the overlay never shows a half-loaded grid.
     private(set) var hasLoaded = false
+    /// Display names that several installed apps share. These apps show their version under the name.
+    private(set) var sharedDisplayNames: Set<String> = []
 
     @ObservationIgnored private let scanner: CatalogScanner
     @ObservationIgnored private let fileStore: LayoutFileStore
@@ -32,6 +34,11 @@ final class LayoutStore {
     /// The installed app for a placed ID, or nil while the catalog does not know it.
     func app(for id: AppID) -> InstalledApp? {
         catalog[id]
+    }
+
+    /// Search results for the overlay: at most one page of the best matches.
+    func searchResults(matching query: String) -> [InstalledApp] {
+        Array(layout.searchResults(matching: query, in: catalog).prefix(preferences.pageCapacity))
     }
 
     /// Reads the stored layout, then scans and reconciles. Call once at launch.
@@ -60,6 +67,7 @@ final class LayoutStore {
     private func apply(catalog newCatalog: Catalog) {
         let reconciled = layout.reconciled(with: newCatalog, pageCapacity: preferences.pageCapacity)
         catalog = newCatalog
+        sharedDisplayNames = newCatalog.sharedDisplayNames
         let isFirstLoad = !hasLoaded
         hasLoaded = true
         guard reconciled != layout || isFirstLoad else {

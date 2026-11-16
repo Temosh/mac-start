@@ -64,4 +64,12 @@ Handoff state:
   - A click on an app launches it and closes the overlay. A click between icons, Escape, switching apps, or switching Spaces closes it. The app you were in gets the focus back.
   - A two-finger swipe, a mouse wheel, the left and right arrow keys, and the page dots all change pages.
   - The overlay also opens over a full-screen app.
-- Left for later milestones: the search field (M4), opening folders (M5, folders already render), and the Dock icon menu with Settings (M6). The arrow keys turn pages for now; M4 makes them move a selection.
+- Left for later milestones: opening folders (M5, folders already render) and the Dock icon menu with Settings (M6).
+- M4: built on 2026-11-16 and waiting for the developer's check by hand. 69 tests pass. Search ranking (`Layout.searchResults(matching:in:)`) and arrow-key movement (`GridNavigation`) are in `MacStartCore` and tested. The screen was locked, so only a launch smoke test ran: the overlay shows at 1800 x 1169, alpha 1, and toggles. Return on a selected folder does nothing until M5.
+- Developer's checks for M4:
+  - Typing filters to one grid of results right away, without clicking the field. The best match is first and highlighted, and Return launches it.
+  - The arrow keys move the highlight through the results and through the grid. In the grid, left and right at the edge change page.
+  - Escape clears the search first, and a second Escape closes the overlay.
+  - Hidden apps never show up in results.
+  - Apps that share a name show their version below it. On this Mac, two apps show as "Siri".
+  - VoiceOver reads app names and the selection. Increase Contrast adds outlines and a stronger dimming.
