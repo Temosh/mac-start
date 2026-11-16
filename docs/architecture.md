@@ -1,0 +1,99 @@
+# Architecture
+
+## System Shape
+
+MacStart is a single-process macOS app with a Dock icon (activation policy `.regular`), like Launchpad. Clicking the Dock icon toggles the overlay. Hiding the overlay hands focus back to the previously active app. It is built entirely with Swift Package Manager. A script wraps the built executable into `MacStart.app` and signs it ad hoc. No Xcode project exists. Build commands are in [AGENTS.md](../AGENTS.md#commands), and tooling rules are in [stack.md](../.agents/rules/stack.md).
+
+```mermaid
+flowchart LR
+    HK["HotKey (Carbon)"] --> OC["OverlayController"]
+    OC --> W["Overlay window (AppKit)"]
+    W --> V["SwiftUI grid / search / folders"]
+    V --> LS["LayoutStore (@MainActor)"]
+    LS --> R["Reconcile (Core)"]
+    CAT["AppCatalog + FSEvents watcher"] --> LS
+    LS --> P["LayoutPersistence (JSON file)"]
+    V --> L["AppLauncher (NSWorkspace)"]
+    V --> IC["IconProvider (cache)"]
+```
+
+## Source Layout
+
+```text
+Package.swift
+Sources/
+  MacStartCore/            Library. Foundation only: no AppKit, no SwiftUI.
+    Model/                 AppID, App, Folder, Item, Page, Layout, Preferences
+    Reconcile/             Pure reconcile and invariant checks
+    Catalog/               App bundle scanning (FileManager + Bundle)
+    Persistence/           Layout JSON codec, file store, export/import
+  MacStart/                Executable. App entry and everything AppKit/SwiftUI.
+    App/                   Entry point, AppDelegate, dependency wiring
+    Overlay/               Overlay window and controller, show/hide, display choice
+    Features/
+      Grid/                Pages, icons, paging, drag and drop
+      Folders/             Folder open/close, rename
+      Search/              Type-to-search, keyboard navigation
+      Settings/            Hotkey, grid size, launch at login, hidden apps, export/import
+    Platform/              Thin adapters: HotKey, CatalogWatcher, IconProvider,
+                           AppLauncher, LoginItem
+Tests/
+  MacStartCoreTests/       Swift Testing; reconcile, codec, catalog scan fixtures
+Support/
+  Info.plist               Bundle metadata; copied into the .app by the build script
+  AppIcon.iconset/         Converted to AppIcon.icns with iconutil
+scripts/
+  build-app.sh             swift build, assemble MacStart.app, ad hoc codesign
+.github/workflows/
+  build.yml                CI: build, test, package, artifact, release on tag
+```
+
+These folders are the agreed layout. They are created as the code is written.
+
+## Module Boundaries
+
+- `MacStart` depends on `MacStartCore`. `MacStartCore` never imports `MacStart`, AppKit, or SwiftUI.
+- The domain rules (reconcile, the invariants, the export format) live only in `MacStartCore`, so they can be tested headless.
+- Platform adapters in `MacStart/Platform/` wrap a single system API each and expose a small protocol, so view models can be tested with fakes.
+- SwiftUI views hold no business logic. They call `LayoutStore`, which owns the single mutable `Layout`.
+
+## Key Platform Choices
+
+| Concern | Choice | Reason |
+|---------|--------|--------|
+| Global hotkey | Carbon `RegisterEventHotKey` | Works without Accessibility permission |
+| Overlay window | Borderless `NSPanel` hosting SwiftUI through `NSHostingView`, placed above the Dock and menu bar, joining the active Space | Covers the whole screen like Launchpad |
+| Target display | `NSScreen.screens.first`, the display that holds the menu bar | `NSScreen.main` follows keyboard focus, which is not the main display |
+| Background | `NSVisualEffectView` blur behind the grid | Native look like Launchpad |
+| App discovery | Scan `/Applications`, `/System/Applications`, `~/Applications` recursively (skipping into `.app` bundles), plus FSEvents watching on those roots, debounced | One code path handles the full scan and later updates, which keeps the list free of duplicates |
+| Launching | `NSWorkspace.openApplication(at:configuration:)` | |
+| Icons | `NSWorkspace.icon(forFile:)`, cached by `AppID` in memory | |
+| Layout storage | `~/Library/Application Support/MacStart/layout.json`, written atomically | Human-readable, and uses the same format as export |
+| Preferences | `Preferences` value in `MacStartCore`, stored in `UserDefaults` | Small settings, included in export |
+| Dock icon | `applicationShouldHandleReopen` toggles the overlay; `applicationDockMenu` adds Settings | Same entry point as Launchpad |
+| Launch at login | `SMAppService.mainApp`, registered on first launch, toggled in Settings | On by default |
+
+## Data Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User / gesture tool
+    participant HK as HotKey
+    participant OC as OverlayController
+    participant LS as LayoutStore
+    participant V as Overlay views
+    U->>HK: hotkey pressed
+    HK->>OC: toggle()
+    OC->>LS: current layout (already reconciled)
+    OC->>V: show on main display, focus search
+    U->>V: click app
+    V->>OC: launch(appID)
+    OC->>OC: hide overlay
+```
+
+Catalog changes from FSEvents trigger a rescan, then `LayoutStore` reconciles and saves. All layout mutations go through `LayoutStore` on the main actor. Scanning and file I/O run off the main actor.
+
+## Testing Strategy
+
+- Unit tests cover `MacStartCore`: reconcile invariants, duplicate collapsing, the export/import round trip, schema version rejection, and catalog scanning against temporary bundle fixtures.
+- The overlay, hotkey, and launching are verified manually by building and running the app. UI automation is out of scope for now.
