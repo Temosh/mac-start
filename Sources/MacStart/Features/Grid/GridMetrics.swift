@@ -22,6 +22,16 @@ struct TileStyle: Equatable {
     var labelSpacing: CGFloat {
         iconSize * 0.06
     }
+
+    /// The tile's height: padding, icon, spacing, one line of label, padding.
+    var height: CGFloat {
+        2 * padding + iconSize + labelSpacing + labelFontSize * 1.2
+    }
+
+    /// The clear margin app icons keep around their artwork, about a tenth of their size.
+    var iconArtworkInset: CGFloat {
+        iconSize * 0.1
+    }
 }
 
 /// The geometry of the grid for one overlay size and grid size.
@@ -79,9 +89,8 @@ struct GridMetrics: Equatable {
     /// padding.
     func iconCenter(ofSlot slot: Int) -> CGPoint {
         let style = tileStyle
-        let tileHeight = 2 * style.padding + iconSize + style.labelSpacing + labelFontSize * 1.2
         let slotCenter = center(ofSlot: slot)
-        return CGPoint(x: slotCenter.x, y: slotCenter.y - tileHeight / 2 + style.padding + iconSize / 2)
+        return CGPoint(x: slotCenter.x, y: slotCenter.y - style.height / 2 + style.padding + iconSize / 2)
     }
 
     /// Where the buttons beside the search field end: at the right edge of the last column's icons.

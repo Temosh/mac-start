@@ -37,8 +37,13 @@ struct FolderPanelView: View {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay {
+                    // A light veil, so the panel reads as glass above the darkened grid rather than as a hole in it.
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .strokeBorder(.white.opacity(contrast == .increased ? 0.85 : 0.2), lineWidth: 1)
+                        .fill(.white.opacity(0.07))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .strokeBorder(.white.opacity(contrast == .increased ? 0.85 : 0.3), lineWidth: 1)
                 }
                 .frame(width: metrics.frame.width, height: metrics.frame.height)
                 // A click on the panel itself must not reach the backdrop and close the folder.

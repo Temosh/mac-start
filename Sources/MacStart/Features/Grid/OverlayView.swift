@@ -35,6 +35,8 @@ struct OverlayActions {
 struct OverlayView: View {
     /// The coordinate space of the whole overlay, which drag locations use.
     static let coordinateSpace = "overlay"
+    /// How much the grid behind an open folder blurs, in points.
+    static let folderBackdropBlur: CGFloat = 8
 
     let store: LayoutStore
     @Bindable var state: OverlayState
@@ -57,9 +59,15 @@ struct OverlayView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { actions.dismiss() }
                     .emptySpaceMenu(actions)
-                content(metrics: metrics)
-                // Under the folder panel, so an open folder dims and covers the page dots as it does the grid.
-                bottomBar(metrics: metrics)
+                ZStack {
+                    content(metrics: metrics)
+                    // Under the folder panel, so an open folder dims and covers the page dots as it does the grid.
+                    bottomBar(metrics: metrics)
+                }
+                // Behind an open folder the grid blurs as it darkens, so the panel stands out.
+                .animation(reduceMotion ? nil : .easeOut(duration: OverlayState.folderZoomDuration)) { grid in
+                    grid.blur(radius: state.openFolderID == nil ? 0 : Self.folderBackdropBlur)
+                }
                 folderPanel(metrics: metrics)
                 SearchField(
                     query: $state.query,
