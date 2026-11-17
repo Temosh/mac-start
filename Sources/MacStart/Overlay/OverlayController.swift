@@ -528,10 +528,13 @@ final class OverlayController: NSObject, NSWindowDelegate {
     /// because the pages behind it are about to move.
     private func moveItems(_ ids: Set<Item.ID>, toPage page: Int, alongWith changes: () -> Void = {}) {
         turnPage {
+            // A page without room for the items takes none of them, and nothing else changes either.
+            guard store.moveItems(ids, toPage: page) else {
+                return nil
+            }
             if state.openFolderID != nil {
                 closeFolder()
             }
-            store.moveItems(ids, toPage: page)
             changes()
             // Emptied pages are gone now, so the page of the first moved item tells where they went.
             return store.layout.pages.firstIndex { candidate in
@@ -543,14 +546,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
     /// Applies an edit action to the selected items, then clears the selection and shows where they went.
     private func performEdit(_ action: EditAction) {
         let selection = state.editSelection
-        let apps = Set(
-            selection.compactMap { id -> AppID? in
-                if case .app(let appID) = id {
-                    return appID
-                }
-                return nil
-            }
-        )
+        let apps = selectedApps
         switch action {
         case .newFolder:
             turnPage {
@@ -567,14 +563,43 @@ final class OverlayController: NSObject, NSWindowDelegate {
             clearEditSelection()
             closeFolderIfGone()
         case .removeFromFolder:
-            guard let folderID = state.openFolderID else {
+            guard let folderID = state.openFolderID, store.removeApps(apps, fromFolder: folderID) else {
                 return
             }
-            store.removeApps(apps, fromFolder: folderID)
             clearEditSelection()
             closeFolderIfGone()
         case .deselectAll:
             clearEditSelection()
+        }
+    }
+
+    /// The apps in the edit selection.
+    private var selectedApps: Set<AppID> {
+        Set(
+            state.editSelection.compactMap { id -> AppID? in
+                if case .app(let appID) = id {
+                    return appID
+                }
+                return nil
+            }
+        )
+    }
+
+    /// True when an edit action fits, since no edit pushes items to the next page.
+    private func canPerformEdit(_ action: EditAction) -> Bool {
+        let capacity = store.preferences.pageCapacity
+        switch action {
+        case .newFolder:
+            return store.layout.canMakeFolder(of: selectedApps, pageCapacity: capacity)
+        case .moveToPage(let page):
+            return store.layout.canMoveItems(state.editSelection, toPage: page, pageCapacity: capacity)
+        case .removeFromFolder:
+            guard let folderID = state.openFolderID else {
+                return false
+            }
+            return store.layout.canRemoveApps(selectedApps, fromFolder: folderID, pageCapacity: capacity)
+        case .hide, .deselectAll:
+            return true
         }
     }
 
@@ -802,11 +827,27 @@ final class OverlayController: NSObject, NSWindowDelegate {
             dismiss: { [weak self] in self?.dismiss() },
             showPage: { [weak self] page in self?.showPage(page) },
             moveItems: { [weak self] ids, page in self?.moveItems(ids, toPage: page) },
+            canMoveItems: { [weak self] ids, page in
+                guard let self else {
+                    return false
+                }
+                return store.layout.canMoveItems(ids, toPage: page, pageCapacity: store.preferences.pageCapacity)
+            },
             closeFolder: { [weak self] in self?.closeFolder() },
             renameFolder: { [weak self] id, name in self?.store.renameFolder(id, to: name) },
             removeFromFolder: { [weak self] id, index in
                 self?.store.removeApp(fromFolder: id, at: index)
                 self?.closeFolderIfGone()
+            },
+            canRemoveFromFolder: { [weak self] id, index in
+                guard let self, let folder = store.folder(withID: id), folder.apps.indices.contains(index) else {
+                    return false
+                }
+                return store.layout.canRemoveApps(
+                    [folder.apps[index]],
+                    fromFolder: id,
+                    pageCapacity: store.preferences.pageCapacity
+                )
             },
             showInFinder: { [weak self] app in self?.showInFinder(app) },
             hide: { [weak self] app in self?.store.hide(app.id) },
@@ -814,6 +855,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             toggleEditing: { [weak self] in self?.toggleEditing() },
             select: { [weak self] item in self?.select(item) },
             performEdit: { [weak self] action in self?.performEdit(action) },
+            canPerformEdit: { [weak self] action in self?.canPerformEdit(action) ?? false },
             dragChanged: { [weak self] update in self?.drags.update(update) },
             dragEnded: { [weak self] in self?.drags.end() }
         )

@@ -18,6 +18,13 @@ struct DragSession: Equatable {
     var folderTargetSlot: Int?
     /// While the drag is inside the open folder: the index among the folder's apps where the app would land.
     var folderGapIndex: Int?
+    /// True while `page` has no room for the dragged item. No edit pushes items to the next page.
+    var isPageFull = false
+
+    /// True when a drop now would put the item back: over a page with no room, except onto a folder target.
+    var isDropRefused: Bool {
+        isPageFull && folderTargetSlot == nil
+    }
 
     /// The center of the dragged tile, which aims the drop, for the pointer at `location`.
     func tileCenter(for location: CGPoint) -> CGPoint {

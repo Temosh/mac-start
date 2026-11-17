@@ -60,9 +60,13 @@ final class LayoutStore {
 
     // MARK: - Editing
 
-    /// Moves the item at `source` to `destination`. See `Layout.moveItem(from:to:pageCapacity:)`.
-    func moveItem(from source: LayoutLocation, to destination: GridPosition) {
-        edit { $0.moveItem(from: source, to: destination, pageCapacity: preferences.pageCapacity) }
+    /// Moves the item at `source` to `destination`. See `Layout.moveItem(from:to:pageCapacity:)`. Returns false
+    /// when the destination page has no room.
+    @discardableResult
+    func moveItem(from source: LayoutLocation, to destination: GridPosition) -> Bool {
+        var isMoved = false
+        edit { isMoved = $0.moveItem(from: source, to: destination, pageCapacity: preferences.pageCapacity) }
+        return isMoved
     }
 
     /// Drops the app at `source` onto the item at `target`, making or joining a folder. A new folder is named
@@ -83,14 +87,20 @@ final class LayoutStore {
         return folderID
     }
 
-    /// Moves an app out of its folder into the slot after the folder.
-    func removeApp(fromFolder id: UUID, at index: Int) {
-        edit { $0.removeApp(fromFolder: id, at: index, pageCapacity: preferences.pageCapacity) }
+    /// Moves an app out of its folder into the slot after the folder. Returns false when the page has no room.
+    @discardableResult
+    func removeApp(fromFolder id: UUID, at index: Int) -> Bool {
+        var isRemoved = false
+        edit { isRemoved = $0.removeApp(fromFolder: id, at: index, pageCapacity: preferences.pageCapacity) }
+        return isRemoved
     }
 
-    /// Moves several apps out of a folder, into the slots right after it.
-    func removeApps(_ apps: Set<AppID>, fromFolder id: UUID) {
-        edit { $0.removeApps(apps, fromFolder: id, pageCapacity: preferences.pageCapacity) }
+    /// Moves several apps out of a folder, into the slots right after it. Returns false when the page has no room.
+    @discardableResult
+    func removeApps(_ apps: Set<AppID>, fromFolder id: UUID) -> Bool {
+        var isRemoved = false
+        edit { isRemoved = $0.removeApps(apps, fromFolder: id, pageCapacity: preferences.pageCapacity) }
+        return isRemoved
     }
 
     /// Reorders an app inside its folder.
@@ -119,9 +129,13 @@ final class LayoutStore {
         }
     }
 
-    /// Moves items to the end of `page`, in reading order. See `Layout.moveItems(_:toPage:pageCapacity:)`.
-    func moveItems(_ ids: Set<Item.ID>, toPage page: Int) {
-        edit { $0.moveItems(ids, toPage: page, pageCapacity: preferences.pageCapacity) }
+    /// Moves items to the end of `page`, in reading order. See `Layout.moveItems(_:toPage:pageCapacity:)`. Returns
+    /// false when the page has no room for them.
+    @discardableResult
+    func moveItems(_ ids: Set<Item.ID>, toPage page: Int) -> Bool {
+        var isMoved = false
+        edit { isMoved = $0.moveItems(ids, toPage: page, pageCapacity: preferences.pageCapacity) }
+        return isMoved
     }
 
     /// Makes a folder of the apps where the first of them is, named after the first App Store category among

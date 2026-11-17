@@ -64,7 +64,12 @@ struct GridItemView: View {
         .focusEffectDisabled()
         .contextMenu {
             if let selectionSummary {
-                SelectionMenuItems(summary: selectionSummary, pageCount: pageCount, perform: actions.performEdit)
+                SelectionMenuItems(
+                    summary: selectionSummary,
+                    pageCount: pageCount,
+                    canPerform: actions.canPerformEdit,
+                    perform: actions.performEdit
+                )
             } else {
                 Button("Hide") {
                     actions.hide(app)
@@ -77,6 +82,7 @@ struct GridItemView: View {
                     Button("Remove from Folder") {
                         actions.removeFromFolder(folderID, index)
                     }
+                    .disabled(!actions.canRemoveFromFolder(folderID, index))
                 }
             }
         }
@@ -88,7 +94,9 @@ struct GridItemView: View {
     /// Moves just this item to the end of a page.
     private var moveToPageMenu: some View {
         Menu("Move to Page") {
-            PageMenuItems(pageCount: pageCount) { actions.moveItems([item.id], $0) }
+            PageMenuItems(pageCount: pageCount, canMove: { actions.canMoveItems([item.id], $0) }) {
+                actions.moveItems([item.id], $0)
+            }
         }
     }
 
@@ -127,7 +135,12 @@ struct GridItemView: View {
         .focusEffectDisabled()
         .contextMenu {
             if let selectionSummary {
-                SelectionMenuItems(summary: selectionSummary, pageCount: pageCount, perform: actions.performEdit)
+                SelectionMenuItems(
+                    summary: selectionSummary,
+                    pageCount: pageCount,
+                    canPerform: actions.canPerformEdit,
+                    perform: actions.performEdit
+                )
             } else {
                 moveToPageMenu
             }
@@ -243,32 +256,57 @@ struct TileButtonStyle: ButtonStyle {
     }
 }
 
-/// The tile that follows the pointer during a drag.
+/// The tile that follows the pointer during a drag. Where a drop would put the item back, it fades and shows the
+/// system's prohibition mark on its icon.
 struct DraggedTileView: View {
     let item: Item
+    /// True when a drop where the tile is now would put the item back, as over a page with no room.
+    let isDropRefused: Bool
     let style: TileStyle
     let store: LayoutStore
     let icons: IconProvider
 
     var body: some View {
-        Group {
-            switch item {
-            case .app(let id):
-                if let app = store.app(for: id) {
-                    TileLabel(title: app.displayName, subtitle: nil, isSelected: false, style: style) {
-                        Image(nsImage: icons.icon(for: app, side: style.iconSize))
-                            .resizable()
-                            .interpolation(.high)
-                    }
-                }
-            case .folder(let folder):
-                TileLabel(title: folder.name, subtitle: nil, isSelected: false, style: style) {
-                    FolderIcon(apps: folder.apps.compactMap { store.app(for: $0) }, icons: icons)
+        tile
+            .opacity(isDropRefused ? 0.5 : 0.95)
+            .overlay(alignment: .top) {
+                if isDropRefused, let mark = icons.prohibitionMark {
+                    prohibition(mark)
                 }
             }
+            .scaleEffect(1.08)
+            .animation(.easeOut(duration: 0.12), value: isDropRefused)
+    }
+
+    @ViewBuilder
+    private var tile: some View {
+        switch item {
+        case .app(let id):
+            if let app = store.app(for: id) {
+                TileLabel(title: app.displayName, subtitle: nil, isSelected: false, style: style) {
+                    Image(nsImage: icons.icon(for: app, side: style.iconSize))
+                        .resizable()
+                        .interpolation(.high)
+                }
+            }
+        case .folder(let folder):
+            TileLabel(title: folder.name, subtitle: nil, isSelected: false, style: style) {
+                FolderIcon(apps: folder.apps.compactMap { store.app(for: $0) }, icons: icons)
+            }
         }
-        .scaleEffect(1.08)
-        .opacity(0.95)
+    }
+
+    /// The mark, unfaded, centered on the corner of the icon's artwork, where the edit mode badge sits. App icons
+    /// leave about a tenth of their size clear around the artwork.
+    private func prohibition(_ mark: NSImage) -> some View {
+        let size = style.iconSize * 0.4
+        // The overlay starts centered at the top of the tile. The icon is centered too, `style.padding` below the top.
+        return Image(nsImage: mark)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
+            .offset(x: -style.iconSize * 0.4, y: style.padding + style.iconSize * 0.1 - size / 2)
+            .accessibilityHidden(true)
     }
 }
 

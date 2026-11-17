@@ -8,8 +8,21 @@ import MacStartCore
 final class IconProvider {
     private var cache: [IconKey: NSImage] = [:]
 
+    /// The gray prohibition sign that macOS puts on apps that cannot run on this Mac. A dragged icon shows it where
+    /// it cannot drop. Nil when this macOS has no such icon.
+    private(set) lazy var prohibitionMark: NSImage? = Self.loadProhibitionMark()
+
     private var scale: CGFloat {
         NSScreen.screens.first?.backingScaleFactor ?? 2
+    }
+
+    private static func loadProhibitionMark() -> NSImage? {
+        let path = "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Unsupported.icns"
+        guard let image = NSImage(contentsOfFile: path) else {
+            LogArea.overlay.logger.error("No system prohibition mark at \(path)")
+            return nil
+        }
+        return image
     }
 
     /// The app's icon as a square bitmap of `side` points. The cache key includes the version, so an updated app

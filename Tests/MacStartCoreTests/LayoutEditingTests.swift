@@ -38,12 +38,48 @@ struct LayoutEditingTests {
         #expect(layout.pages == [Page(items: [.app(b), .app(a), .app(c)])])
     }
 
-    @Test func movingOntoAFullPagePushesItsLastItemToTheNextPage() {
+    @Test func movingOntoAFullPageIsRefused() {
+        let original = Layout(pages: [Page(items: [.app(a), .app(b)]), Page(items: [.app(c)])])
+        var layout = original
+
+        let isMoved = layout.moveItem(from: slot(1, 0), to: GridPosition(page: 0, slot: 0), pageCapacity: 2)
+
+        #expect(!isMoved)
+        #expect(layout == original)
+    }
+
+    @Test func reorderingWithinAFullPageIsAllowed() {
+        var layout = Layout(pages: [Page(items: [.app(a), .app(b)])])
+
+        let isMoved = layout.moveItem(from: slot(0, 0), to: GridPosition(page: 0, slot: 1), pageCapacity: 2)
+
+        #expect(isMoved)
+        #expect(layout.pages == [Page(items: [.app(b), .app(a)])])
+    }
+
+    @Test func removingAnAppFromAFolderOnAFullPageIsRefused() {
+        let folder = Folder(name: "Three", apps: [a, b, c])
+        let original = Layout(pages: [Page(items: [.folder(folder), .app(d)])])
+        var layout = original
+
+        let isRemoved = layout.removeApp(fromFolder: folder.id, at: 0, pageCapacity: 2)
+
+        #expect(!isRemoved)
+        #expect(layout == original)
+    }
+
+    @Test func droppingOntoAnAppOnAFullPageMakesAFolder() throws {
         var layout = Layout(pages: [Page(items: [.app(a), .app(b)]), Page(items: [.app(c)])])
 
-        layout.moveItem(from: slot(1, 0), to: GridPosition(page: 0, slot: 0), pageCapacity: 2)
+        let id = layout.dropApp(
+            from: slot(1, 0),
+            onto: GridPosition(page: 0, slot: 1),
+            newFolderName: { _, _ in "New" },
+            pageCapacity: 2
+        )
 
-        #expect(layout.pages == [Page(items: [.app(c), .app(a)]), Page(items: [.app(b)])])
+        let folder = Folder(id: try #require(id), name: "New", apps: [b, c])
+        #expect(layout.pages == [Page(items: [.app(a), .folder(folder)])])
     }
 
     @Test func aDestinationPastTheLastPageAddsAPage() {

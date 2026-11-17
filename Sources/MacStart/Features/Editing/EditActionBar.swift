@@ -50,17 +50,22 @@ struct EditSelectionSummary: Equatable {
     }
 }
 
-/// The items of a Move to Page menu: every page, then a new one at the end.
+/// The items of a Move to Page menu: every page, then a new one at the end. A page without room for the items is
+/// unavailable, because a move never pushes items to the next page.
 struct PageMenuItems: View {
     let pageCount: Int
+    /// True when the items fit on the page.
+    let canMove: @MainActor (Int) -> Bool
     /// Takes the page to move to. One past the last page makes a new page.
     let move: @MainActor (Int) -> Void
 
     var body: some View {
         ForEach(0..<pageCount, id: \.self) { page in
-            Button("Page \(page + 1)") {
+            let hasRoom = canMove(page)
+            Button(hasRoom ? "Page \(page + 1)" : "Page \(page + 1) (No Room)") {
                 move(page)
             }
+            .disabled(!hasRoom)
         }
         Divider()
         Button("New Page") {
@@ -73,21 +78,25 @@ struct PageMenuItems: View {
 struct SelectionMenuItems: View {
     let summary: EditSelectionSummary
     let pageCount: Int
+    /// True when an action fits without pushing items to the next page.
+    let canPerform: @MainActor (EditAction) -> Bool
     let perform: @MainActor (EditAction) -> Void
 
     var body: some View {
         Button("New Folder with Selection") {
             perform(.newFolder)
         }
-        .disabled(summary.newFolderHelp != nil)
+        .disabled(summary.newFolderHelp != nil || !canPerform(.newFolder))
         Menu("Move Selection to Page") {
-            PageMenuItems(pageCount: pageCount) { perform(.moveToPage($0)) }
+            PageMenuItems(pageCount: pageCount, canMove: { canPerform(.moveToPage($0)) }) {
+                perform(.moveToPage($0))
+            }
         }
         if summary.countInOpenFolder != nil {
             Button("Remove Selection from Folder") {
                 perform(.removeFromFolder)
             }
-            .disabled(summary.removeFromFolderHelp != nil)
+            .disabled(summary.removeFromFolderHelp != nil || !canPerform(.removeFromFolder))
         }
         Button("Hide Selection") {
             perform(.hide)
@@ -107,10 +116,14 @@ struct EditActionBar: View {
     let openFolder: Folder?
     let pageCount: Int
     let isHighContrast: Bool
+    /// True when an action fits without pushing items to the next page.
+    let canPerform: @MainActor (EditAction) -> Bool
     let perform: @MainActor (EditAction) -> Void
 
     var body: some View {
         let summary = EditSelectionSummary(selection, openFolder: openFolder)
+        let newFolderHelp =
+            summary.newFolderHelp ?? (canPerform(.newFolder) ? nil : "No room on this page for a new folder")
         HStack(spacing: 2) {
             Text(selection.isEmpty ? "Click items to select them" : "\(selection.count) selected")
                 .foregroundStyle(.white.opacity(isHighContrast ? 0.95 : 0.75))
@@ -118,20 +131,19 @@ struct EditActionBar: View {
                 .padding(.horizontal, 12)
             Divider()
                 .frame(height: 18)
-            barButton("New Folder", systemImage: "folder.badge.plus", help: summary.newFolderHelp) {
+            barButton("New Folder", systemImage: "folder.badge.plus", help: newFolderHelp) {
                 perform(.newFolder)
             }
-            .disabled(summary.newFolderHelp != nil)
+            .disabled(newFolderHelp != nil)
             moveMenu
             if openFolder != nil {
-                barButton(
-                    "Remove from Folder",
-                    systemImage: "folder.badge.minus",
-                    help: summary.removeFromFolderHelp
-                ) {
+                let removeHelp =
+                    summary.removeFromFolderHelp
+                    ?? (canPerform(.removeFromFolder) ? nil : "No room on this page for these apps")
+                barButton("Remove from Folder", systemImage: "folder.badge.minus", help: removeHelp) {
                     perform(.removeFromFolder)
                 }
-                .disabled(summary.removeFromFolderHelp != nil)
+                .disabled(removeHelp != nil)
             }
             barButton("Hide", systemImage: "eye.slash", help: summary.hideHelp) {
                 perform(.hide)
@@ -157,7 +169,9 @@ struct EditActionBar: View {
 
     private var moveMenu: some View {
         Menu {
-            PageMenuItems(pageCount: pageCount) { perform(.moveToPage($0)) }
+            PageMenuItems(pageCount: pageCount, canMove: { canPerform(.moveToPage($0)) }) {
+                perform(.moveToPage($0))
+            }
         } label: {
             Label("Move to Page", systemImage: "arrow.right.square")
         }

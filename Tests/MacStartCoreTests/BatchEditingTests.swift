@@ -50,12 +50,36 @@ struct BatchEditingTests {
         #expect(layout.pages == [Page(items: [.app(b), .app(c)]), Page(items: [.app(a)])])
     }
 
-    @Test func itemsThatDoNotFitMoveOnAndAnEmptiedPageGoesAway() {
-        var layout = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(b), .app(c)])])
+    @Test func movingMoreItemsThanAPageHasRoomForIsRefused() {
+        let original = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(b), .app(c)])])
+        var layout = original
 
-        layout.moveItems(ids(.app(b), .app(c)), toPage: 0, pageCapacity: 2)
+        let isMoved = layout.moveItems(ids(.app(b), .app(c)), toPage: 0, pageCapacity: 2)
 
-        #expect(layout.pages == [Page(items: [.app(a), .app(b)]), Page(items: [.app(c)])])
+        #expect(!isMoved)
+        #expect(layout == original)
+        #expect(!original.canMoveItems(ids(.app(b), .app(c)), toPage: 0, pageCapacity: 2))
+        #expect(original.canMoveItems(ids(.app(b)), toPage: 0, pageCapacity: 2))
+    }
+
+    @Test func anEmptiedPageGoesAway() {
+        var layout = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(b)])])
+
+        let isMoved = layout.moveItems(ids(.app(b)), toPage: 0, pageCapacity: 2)
+
+        #expect(isMoved)
+        #expect(layout.pages == [Page(items: [.app(a), .app(b)])])
+    }
+
+    @Test func aNewPageTakesAsManyPagesAsTheItemsFill() {
+        var layout = Layout(pages: [Page(items: [.app(a), .app(b)]), Page(items: [.app(c), .app(d)])])
+
+        let isMoved = layout.moveItems(ids(.app(a), .app(b), .app(c)), toPage: 2, pageCapacity: 2)
+
+        #expect(isMoved)
+        #expect(
+            layout.pages == [Page(items: [.app(d)]), Page(items: [.app(a), .app(b)]), Page(items: [.app(c)])]
+        )
     }
 
     @Test func unknownItemsChangeNothing() {
@@ -89,14 +113,27 @@ struct BatchEditingTests {
         #expect(layout.pages == [Page(items: [.app(b), .app(a), .app(c), .app(d)])])
     }
 
-    @Test func appsOutsideTheFolderStayAndRemovedAppsThatDoNotFitMoveOn() {
+    @Test func appsOutsideTheFolderStay() {
         let folder = Folder(name: "Three", apps: [a, b, c])
         var layout = Layout(pages: [Page(items: [.folder(folder), .app(d)])])
 
-        layout.removeApps([a, d], fromFolder: folder.id, pageCapacity: 2)
+        let isRemoved = layout.removeApps([a, d], fromFolder: folder.id, pageCapacity: capacity)
 
         let rest = Folder(id: folder.id, name: "Three", apps: [b, c])
-        #expect(layout.pages == [Page(items: [.folder(rest), .app(a)]), Page(items: [.app(d)])])
+        #expect(isRemoved)
+        #expect(layout.pages == [Page(items: [.folder(rest), .app(a), .app(d)])])
+    }
+
+    @Test func removingAppsFromAFolderOnAFullPageIsRefused() {
+        let folder = Folder(name: "Three", apps: [a, b, c])
+        let original = Layout(pages: [Page(items: [.folder(folder), .app(d)])])
+        var layout = original
+
+        let isRemoved = layout.removeApps([a], fromFolder: folder.id, pageCapacity: 2)
+
+        #expect(!isRemoved)
+        #expect(layout == original)
+        #expect(!original.canRemoveApps([a], fromFolder: folder.id, pageCapacity: 2))
     }
 
     // MARK: - New folder
@@ -147,6 +184,27 @@ struct BatchEditingTests {
 
         let folder = Folder(id: try #require(id), name: "New", apps: [a, c])
         #expect(layout.pages == [Page(items: [.app(b), .folder(folder)])])
+    }
+
+    @Test func aNewFolderInAnAppsSlotFitsAFullPage() throws {
+        var layout = Layout(pages: [Page(items: [.app(a), .app(b)])])
+
+        let id = layout.makeFolder(of: [a, b], named: { _ in "New" }, pageCapacity: 2)
+
+        let folder = Folder(id: try #require(id), name: "New", apps: [a, b])
+        #expect(layout.pages == [Page(items: [.folder(folder)])])
+    }
+
+    @Test func aNewFolderThatDoesNotFitItsPageIsRefused() {
+        let existing = Folder(name: "Old", apps: [a, b, c])
+        let original = Layout(pages: [Page(items: [.folder(existing), .app(d)])])
+        var layout = original
+
+        let id = layout.makeFolder(of: [a, b], named: { _ in "New" }, pageCapacity: 2)
+
+        #expect(id == nil)
+        #expect(layout == original)
+        #expect(!original.canMakeFolder(of: [a, b], pageCapacity: 2))
     }
 
     @Test func fewerThanTwoPlacedAppsMakeNoFolder() {

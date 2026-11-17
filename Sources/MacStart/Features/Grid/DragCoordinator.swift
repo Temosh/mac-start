@@ -195,6 +195,7 @@ final class DragCoordinator {
     /// the dragged icon after it rests between icons.
     private func updateGrid(_ drag: inout DragSession, tileCenter: CGPoint, metrics: GridMetrics) {
         let count = itemCountWithoutDraggedItem(onPage: drag.page, drag: drag)
+        drag.isPageFull = count >= store.preferences.pageCapacity
         let hoveredSlot = metrics.slot(at: tileCenter)
         let hoveredItem = itemIndex(showingAt: hoveredSlot, gapSlot: drag.gapSlot, count: count)
 
@@ -208,6 +209,12 @@ final class DragCoordinator {
         }
         stopFolderTimer()
         drag.folderTargetSlot = nil
+        guard !drag.isPageFull else {
+            // A full page makes no room, so a drop there pushes nothing to the next page. It puts the item back.
+            stopReflowTimer()
+            drag.gapSlot = nil
+            return
+        }
         let gapSlot = min(hoveredSlot, count)
         if gapSlot == drag.gapSlot {
             stopReflowTimer()
@@ -318,7 +325,9 @@ final class DragCoordinator {
         drag.page = page
         drag.folderTargetSlot = nil
         let tileCenter = drag.tileCenter(for: state.dragLocation)
-        drag.gapSlot = min(metrics.slot(at: tileCenter), itemCountWithoutDraggedItem(onPage: page, drag: drag))
+        let count = itemCountWithoutDraggedItem(onPage: page, drag: drag)
+        drag.isPageFull = count >= store.preferences.pageCapacity
+        drag.gapSlot = drag.isPageFull ? nil : min(metrics.slot(at: tileCenter), count)
         showPage(page) { state.drag = drag }
     }
 

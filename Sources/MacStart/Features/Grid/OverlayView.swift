@@ -9,9 +9,13 @@ struct OverlayActions {
     let showPage: @MainActor (Int) -> Void
     /// Moves items to the end of a page, then shows where they went.
     let moveItems: @MainActor (Set<Item.ID>, Int) -> Void
+    /// True when the items fit on the page, since no edit pushes items to the next page.
+    let canMoveItems: @MainActor (Set<Item.ID>, Int) -> Bool
     let closeFolder: @MainActor () -> Void
     let renameFolder: @MainActor (UUID, String) -> Void
     let removeFromFolder: @MainActor (UUID, Int) -> Void
+    /// True when the app fits on its folder's page outside the folder.
+    let canRemoveFromFolder: @MainActor (UUID, Int) -> Bool
     let showInFinder: @MainActor (InstalledApp) -> Void
     let hide: @MainActor (InstalledApp) -> Void
     let openSettings: @MainActor () -> Void
@@ -20,6 +24,8 @@ struct OverlayActions {
     /// Selects or deselects an item in edit mode, as a click on its badge does.
     let select: @MainActor (Item) -> Void
     let performEdit: @MainActor (EditAction) -> Void
+    /// True when an edit action fits without pushing items to the next page.
+    let canPerformEdit: @MainActor (EditAction) -> Bool
     let dragChanged: @MainActor (DragUpdate) -> Void
     let dragEnded: @MainActor () -> Void
 }
@@ -181,6 +187,7 @@ struct OverlayView: View {
                     openFolder: state.openFolderID.flatMap { store.folder(withID: $0) },
                     pageCount: store.layout.pages.count,
                     isHighContrast: contrast == .increased,
+                    canPerform: actions.canPerformEdit,
                     perform: actions.performEdit
                 )
                 // Holds the place of the page dots, which sit under the folder panel.
@@ -272,9 +279,11 @@ struct DragLayer: View {
 
     var body: some View {
         if let drag = state.drag, let center = state.dragTileCenter {
-            DraggedTileView(item: drag.item, style: style, store: store, icons: icons)
-                .position(center)
-                .allowsHitTesting(false)
+            DraggedTileView(
+                item: drag.item, isDropRefused: drag.isDropRefused, style: style, store: store, icons: icons
+            )
+            .position(center)
+            .allowsHitTesting(false)
         }
     }
 }

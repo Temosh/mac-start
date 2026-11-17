@@ -33,7 +33,7 @@ erDiagram
 3. Every placed `AppID` resolves to an installed app after reconcile.
 4. A folder holds at least 2 apps. A folder left with 1 app dissolves into a plain item in the same slot. A folder left with 0 apps is removed.
 5. No page is empty except page 1 when nothing is installed. Empty trailing pages are removed.
-6. A page never holds more items than the grid capacity (columns × rows from `Preferences`). Extra items move onto the next page. When the grid size shrinks, the overflow cascades forward and order is preserved.
+6. A page never holds more items than the grid capacity (columns × rows from `Preferences`). Extra items move onto the next page. When the grid size shrinks, the overflow cascades forward and order is preserved. User edits never cause this cascade (see below).
 
 Reconcile enforces all six invariants. It runs after every catalog change, after an import, and at launch.
 
@@ -75,11 +75,11 @@ The catalog holds every `.app` bundle with an `Info.plist` under `/Applications`
 
 Every edit is followed by reconcile, so the invariants always hold. Positions count the way the overlay shows them during a drag: with the dragged item already taken out.
 
-- Moving an item puts it into the destination slot; the items from there on move one slot later. A destination one page past the last page adds a page. Overflow cascades as in reconcile.
+- Moving an item puts it into the destination slot; the items from there on move one slot later. A destination one page past the last page adds a page. An edit never pushes items to the next page: a move, taking apps out of a folder, or a new folder that would overfill a page is refused and changes nothing ([ADR 0001](adr/0001-never-push-items-to-the-next-page.md)). Only reconcile cascades overflow.
 - Dropping an app onto an app replaces the target with a folder of the target and the dropped app, in that order. The folder is named after the target app's App Store category (`LSApplicationCategoryType`, for example "Developer Tools"), else the dropped app's, else "Folder".
 - Dropping an app onto a folder appends it. A folder cannot go into another folder.
 - "Remove from Folder" puts the app into the slot right after the folder. A folder left with one app dissolves into that app.
-- Moving several items to a page appends them to its end in reading order: page by page and slot by slot, with the apps of a folder in the folder's order. Apps leave their folders. A page one past the last adds a page, and overflow cascades.
+- Moving several items to a page appends them to its end in reading order: page by page and slot by slot, with the apps of a folder in the folder's order. Apps leave their folders. A page one past the last adds as many pages at the end as the items fill. A page without room for all of them takes none.
 - Making a folder of several apps puts it where the first of them is in reading order: in that app's slot, or right after the folder that holds it. It needs two or more placed apps. It is named after the first App Store category among them, else "Folder".
 - Removing several apps from a folder puts them into the slots right after it, in the folder's order. Apps elsewhere stay where they are.
 - Renaming trims surrounding whitespace; an empty name keeps the old one.

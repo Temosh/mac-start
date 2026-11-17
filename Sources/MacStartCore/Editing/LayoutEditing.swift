@@ -20,9 +20,10 @@ extension Folder {
     }
 }
 
-/// Edits from dragging and the folder panel. Each edit leaves the layout normalized: folders with fewer than 2
-/// apps dissolve, empty pages go away, and items that do not fit a page move onto the next one. Positions are
-/// counted as the overlay shows them during a drag, which is with the dragged item already taken out.
+/// Edits made by the user. Each edit leaves the layout normalized: folders with fewer than 2 apps dissolve and
+/// empty pages go away. An edit never pushes an item to the next page: one that would overfill a page is refused
+/// and changes nothing, so the user's arrangement of every page stays as it is. Positions are counted as the
+/// overlay shows them during a drag, which is with the dragged item already taken out.
 extension Layout {
     /// The slot of the folder with `id`.
     public func position(ofFolder id: UUID) -> GridPosition? {
@@ -59,18 +60,21 @@ extension Layout {
 
     /// Moves the item at `source` to `destination`. The item lands in the destination slot, and the items from
     /// there on move one slot later. A destination page one past the last page adds a page. An app moved out of
-    /// a folder leaves the folder.
-    public mutating func moveItem(from source: LayoutLocation, to destination: GridPosition, pageCapacity: Int) {
-        guard let item = extractItem(at: source) else {
-            return
+    /// a folder leaves the folder. Returns false, and changes nothing, when the destination page has no room.
+    @discardableResult
+    public mutating func moveItem(from source: LayoutLocation, to destination: GridPosition, pageCapacity: Int) -> Bool
+    {
+        var edited = self
+        guard let item = edited.extractItem(at: source) else {
+            return false
         }
-        let page = min(max(destination.page, 0), pages.count)
-        if page == pages.count {
-            pages.append(Page())
+        let page = min(max(destination.page, 0), edited.pages.count)
+        if page == edited.pages.count {
+            edited.pages.append(Page())
         }
-        let slot = min(max(destination.slot, 0), pages[page].items.count)
-        pages[page].items.insert(item, at: slot)
-        pages = Self.normalized(pages, pageCapacity: pageCapacity)
+        let slot = min(max(destination.slot, 0), edited.pages[page].items.count)
+        edited.pages[page].items.insert(item, at: slot)
+        return apply(edited.pages, pageCapacity: pageCapacity)
     }
 
     /// Drops the app at `source` onto the item at `target`. Onto an app, the two make a new folder in the
@@ -104,17 +108,21 @@ extension Layout {
             folder = existing
         }
         edited.pages[target.page].items[target.slot] = .folder(folder)
-        edited.pages = Self.normalized(edited.pages, pageCapacity: pageCapacity)
+        guard edited.apply(edited.pages, pageCapacity: pageCapacity) else {
+            return nil
+        }
         self = edited
         return folder.id
     }
 
-    /// Moves an app out of its folder into the slot right after the folder.
-    public mutating func removeApp(fromFolder id: UUID, at index: Int, pageCapacity: Int) {
+    /// Moves an app out of its folder into the slot right after the folder. Returns false, and changes nothing,
+    /// when the folder's page has no room.
+    @discardableResult
+    public mutating func removeApp(fromFolder id: UUID, at index: Int, pageCapacity: Int) -> Bool {
         guard let position = position(ofFolder: id) else {
-            return
+            return false
         }
-        moveItem(
+        return moveItem(
             from: .inFolder(id, index: index),
             to: GridPosition(page: position.page, slot: position.slot + 1),
             pageCapacity: pageCapacity
@@ -122,22 +130,31 @@ extension Layout {
     }
 
     /// Moves the given apps out of a folder into the slots right after it, in the folder's order. Apps that are
-    /// not in the folder stay where they are. A folder left with one app dissolves into it.
-    public mutating func removeApps(_ apps: Set<AppID>, fromFolder id: UUID, pageCapacity: Int) {
+    /// not in the folder stay where they are. A folder left with one app dissolves into it. Returns false, and
+    /// changes nothing, when the folder's page has no room for them.
+    @discardableResult
+    public mutating func removeApps(_ apps: Set<AppID>, fromFolder id: UUID, pageCapacity: Int) -> Bool {
         guard
             let position = position(ofFolder: id),
             case .folder(var folder) = pages[position.page].items[position.slot]
         else {
-            return
+            return false
         }
         let removed = folder.apps.filter(apps.contains)
         guard !removed.isEmpty else {
-            return
+            return false
         }
+        var edited = pages
         folder.apps.removeAll(where: apps.contains)
-        pages[position.page].items[position.slot] = .folder(folder)
-        pages[position.page].items.insert(contentsOf: removed.map(Item.app), at: position.slot + 1)
-        pages = Self.normalized(pages, pageCapacity: pageCapacity)
+        edited[position.page].items[position.slot] = .folder(folder)
+        edited[position.page].items.insert(contentsOf: removed.map(Item.app), at: position.slot + 1)
+        return apply(edited, pageCapacity: pageCapacity)
+    }
+
+    /// True when the apps can leave the folder without overfilling its page.
+    public func canRemoveApps(_ apps: Set<AppID>, fromFolder id: UUID, pageCapacity: Int) -> Bool {
+        var trial = self
+        return trial.removeApps(apps, fromFolder: id, pageCapacity: pageCapacity)
     }
 
     /// Reorders an app inside its folder. `destination` counts without the moved app.
@@ -156,8 +173,11 @@ extension Layout {
 
     /// Moves the items with the given identifiers to the end of `page`, in reading order: page by page and slot by
     /// slot, with the apps of a folder in the folder's order. An app inside a folder leaves the folder. A page one
-    /// past the last page adds a page, and items that do not fit move on to the next page.
-    public mutating func moveItems(_ ids: Set<Item.ID>, toPage page: Int, pageCapacity: Int) {
+    /// past the last page adds as many pages at the end as the items fill. Returns false, and changes nothing,
+    /// when nothing moves or the page has no room for all of them.
+    @discardableResult
+    public mutating func moveItems(_ ids: Set<Item.ID>, toPage page: Int, pageCapacity: Int) -> Bool {
+        var pages = self.pages
         var moved: [Item] = []
         for pageIndex in pages.indices {
             var kept: [Item] = []
@@ -177,20 +197,30 @@ extension Layout {
             pages[pageIndex].items = kept
         }
         guard !moved.isEmpty else {
-            return
+            return false
         }
         // Emptied pages stay until normalizing, so `page` still counts the pages as they were.
         let target = min(max(page, 0), pages.count)
         if target == pages.count {
-            pages.append(Page())
+            let size = max(pageCapacity, 1)
+            for start in stride(from: 0, to: moved.count, by: size) {
+                pages.append(Page(items: Array(moved[start..<min(start + size, moved.count)])))
+            }
+        } else {
+            pages[target].items += moved
         }
-        pages[target].items += moved
-        pages = Self.normalized(pages, pageCapacity: pageCapacity)
+        return apply(pages, pageCapacity: pageCapacity)
+    }
+
+    /// True when the items can move to `page` without overfilling it.
+    public func canMoveItems(_ ids: Set<Item.ID>, toPage page: Int, pageCapacity: Int) -> Bool {
+        var trial = self
+        return trial.moveItems(ids, toPage: page, pageCapacity: pageCapacity)
     }
 
     /// Makes a folder of the given apps, in reading order, where the first of them is: in that app's slot, or right
     /// after the folder that holds it. `name` names the folder from its apps. Returns the folder's identifier, or
-    /// nil when fewer than 2 of the apps are placed.
+    /// nil, changing nothing, when fewer than 2 of the apps are placed or the page has no room for the folder.
     @discardableResult
     public mutating func makeFolder(
         of apps: Set<AppID>,
@@ -202,6 +232,7 @@ extension Layout {
             return nil
         }
         let folder = Folder(name: name(ordered), apps: ordered)
+        var pages = self.pages
         var isPlaced = false
         for pageIndex in pages.indices {
             var kept: [Item] = []
@@ -226,8 +257,13 @@ extension Layout {
             }
             pages[pageIndex].items = kept
         }
-        pages = Self.normalized(pages, pageCapacity: pageCapacity)
-        return folder.id
+        return apply(pages, pageCapacity: pageCapacity) ? folder.id : nil
+    }
+
+    /// True when the apps can make a folder without overfilling a page.
+    public func canMakeFolder(of apps: Set<AppID>, pageCapacity: Int) -> Bool {
+        var trial = self
+        return trial.makeFolder(of: apps, named: { _ in "" }, pageCapacity: pageCapacity) != nil
     }
 
     /// Hides an app. Reconcile then takes it out of its slot or folder, because hidden wins over placement.
@@ -252,6 +288,18 @@ extension Layout {
         }
         folder.name = trimmed
         pages[position.page].items[position.slot] = .folder(folder)
+    }
+
+    /// Takes `edited` as the new pages once they are normalized, unless a page would hold more items than fit.
+    /// Returns false, and changes nothing, in that case.
+    private mutating func apply(_ edited: [Page], pageCapacity: Int) -> Bool {
+        // No cascade: a capacity no page reaches keeps every item on its page, so overfilled pages show.
+        let normalized = Self.normalized(edited, pageCapacity: .max)
+        guard normalized.allSatisfy({ $0.items.count <= pageCapacity }) else {
+            return false
+        }
+        pages = normalized
+        return true
     }
 
     /// Takes the item at `source` out without normalizing, so every other position stays valid. A folder that
