@@ -48,6 +48,9 @@ struct OverlayView: View {
                     .position(x: geometry.size.width / 2, y: metrics.topInset / 2)
                 DragLayer(state: state, style: metrics.tileStyle, store: store, icons: icons)
             }
+            // One drag gesture for the whole overlay. The drag coordinator finds the tile under the press, so the
+            // tiles carry no gestures, and the views under a drag can go away without ending it.
+            .simultaneousGesture(dragGesture(metrics: metrics))
             .coordinateSpace(.named(Self.coordinateSpace))
         }
         .ignoresSafeArea()
@@ -131,16 +134,37 @@ struct OverlayView: View {
         }
     }
 
-    /// The open folder's panel. It also stays, invisible, while an app dragged out of it is still moving.
+    private func dragGesture(metrics: GridMetrics) -> some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .named(Self.coordinateSpace))
+            .onChanged { value in
+                actions.dragChanged(
+                    DragUpdate(
+                        location: value.location,
+                        startLocation: value.startLocation,
+                        grid: metrics,
+                        folderPanel: openFolderMetrics(grid: metrics)
+                    )
+                )
+            }
+            .onEnded { _ in
+                actions.dragEnded()
+            }
+    }
+
+    /// The geometry of the open folder's panel, if a folder is open.
+    private func openFolderMetrics(grid: GridMetrics) -> FolderPanelMetrics? {
+        state.openFolderID
+            .flatMap { store.folder(withID: $0) }
+            .map { FolderPanelMetrics(grid: grid, appCount: $0.apps.count) }
+    }
+
+    /// The open folder's panel.
     @ViewBuilder
     private func folderPanel(metrics: GridMetrics) -> some View {
-        if let folderID = state.openFolderID ?? state.drag?.draggedFolderID, let folder = store.folder(withID: folderID)
-        {
+        if let folderID = state.openFolderID, let folder = store.folder(withID: folderID) {
             FolderPanelView(
                 folder: folder,
-                isVisible: state.openFolderID == folderID,
                 metrics: FolderPanelMetrics(grid: metrics, appCount: folder.apps.count),
-                grid: metrics,
                 state: state,
                 store: store,
                 icons: icons,

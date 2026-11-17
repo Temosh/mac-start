@@ -52,6 +52,15 @@ struct FolderPanelMetrics: Equatable {
         )
     }
 
+    /// The slot whose cell contains `point`, or nil outside the panel's cells.
+    func slot(containing point: CGPoint) -> Int? {
+        let cells = CGRect(
+            origin: contentOrigin,
+            size: CGSize(width: CGFloat(columns) * cellSize.width, height: CGFloat(rows) * cellSize.height)
+        )
+        return cells.contains(point) ? slot(at: point) : nil
+    }
+
     /// The slot of the cell under `point`, clamped to the panel's cells.
     func slot(at point: CGPoint) -> Int {
         let column = Int(((point.x - contentOrigin.x) / cellSize.width).rounded(.down))

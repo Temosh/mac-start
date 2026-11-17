@@ -1,8 +1,8 @@
 import MacStartCore
 import SwiftUI
 
-/// One tile: an app that launches on click, or a folder that opens on click. Tiles with a place in the layout
-/// can be dragged.
+/// One tile: an app that launches on click, or a folder that opens on click. Tiles carry no drag gesture: the
+/// overlay has one for all of them.
 struct GridItemView: View {
     let item: Item
     /// True when the keyboard selection is on this tile.
@@ -10,8 +10,8 @@ struct GridItemView: View {
     /// True while a dragged app rests on this tile, so a drop here makes or fills a folder.
     let isFolderTarget: Bool
     let style: TileStyle
-    /// Where the tile sits, for dragging and the context menu. Nil for search results, which cannot be dragged.
-    let dragContext: DragContext?
+    /// Where the tile sits, for the context menu. Nil for search results.
+    let location: LayoutLocation?
     let store: LayoutStore
     let icons: IconProvider
     let actions: OverlayActions
@@ -20,7 +20,6 @@ struct GridItemView: View {
         tile
             .scaleEffect(isFolderTarget ? 1.15 : 1)
             .animation(.easeOut(duration: 0.15), value: isFolderTarget)
-            .simultaneousGesture(dragGesture, including: dragContext == nil ? .subviews : .all)
     }
 
     @ViewBuilder
@@ -33,28 +32,6 @@ struct GridItemView: View {
         case .folder(let folder):
             folderTile(folder)
         }
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 6, coordinateSpace: .named(OverlayView.coordinateSpace))
-            .onChanged { value in
-                guard let dragContext else {
-                    return
-                }
-                actions.dragChanged(
-                    DragUpdate(
-                        source: dragContext.source,
-                        item: item,
-                        location: value.location,
-                        startLocation: value.startLocation,
-                        grid: dragContext.grid,
-                        folderPanel: dragContext.folderPanel
-                    )
-                )
-            }
-            .onEnded { _ in
-                actions.dragEnded()
-            }
     }
 
     private func appTile(_ app: InstalledApp) -> some View {
@@ -84,7 +61,7 @@ struct GridItemView: View {
             Button("Show in Finder") {
                 actions.showInFinder(app)
             }
-            if case .inFolder(let folderID, let index)? = dragContext?.source {
+            if case .inFolder(let folderID, let index)? = location {
                 Button("Remove from Folder") {
                     actions.removeFromFolder(folderID, index)
                 }

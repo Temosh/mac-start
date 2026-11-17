@@ -62,6 +62,11 @@ struct GridMetrics: Equatable {
         )
     }
 
+    /// The slot whose cell contains `point`, or nil outside the grid.
+    func slot(containing point: CGPoint) -> Int? {
+        gridFrame.contains(point) ? slot(at: point) : nil
+    }
+
     /// The slot of the cell under `point`, clamped to the grid.
     func slot(at point: CGPoint) -> Int {
         let column = Int(((point.x - gridFrame.minX) / cellSize.width).rounded(.down))

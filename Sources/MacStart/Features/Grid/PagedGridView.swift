@@ -14,8 +14,6 @@ struct PagedGridView: View {
     let actions: OverlayActions
 
     var body: some View {
-        // Not lazy: the page a drag started on keeps its tiles while other pages show, because removing the
-        // dragged tile would end its drag gesture.
         HStack(spacing: 0) {
             ForEach(pages.indices, id: \.self) { index in
                 PageView(
@@ -86,13 +84,7 @@ struct PageView: View {
                     isSelected: entry.slot == selectedSlot,
                     isFolderTarget: entry.isFolderTarget,
                     style: metrics.tileStyle,
-                    dragContext: pageIndex.map { page in
-                        DragContext(
-                            source: .slot(GridPosition(page: page, slot: entry.slot)),
-                            grid: metrics,
-                            folderPanel: nil
-                        )
-                    },
+                    location: pageIndex.map { .slot(GridPosition(page: $0, slot: entry.slot)) },
                     store: store,
                     icons: icons,
                     actions: actions

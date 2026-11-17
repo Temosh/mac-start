@@ -5,11 +5,7 @@ import SwiftUI
 /// A click outside the panel closes it. Apps can be dragged within the panel, or out of it into the grid.
 struct FolderPanelView: View {
     let folder: Folder
-    /// False while a drag that left the panel is still running. The panel then stays in place, invisible,
-    /// because the dragged tile's gesture lives on it.
-    let isVisible: Bool
     let metrics: FolderPanelMetrics
-    let grid: GridMetrics
     let state: OverlayState
     let store: LayoutStore
     let icons: IconProvider
@@ -21,18 +17,14 @@ struct FolderPanelView: View {
 
     init(
         folder: Folder,
-        isVisible: Bool,
         metrics: FolderPanelMetrics,
-        grid: GridMetrics,
         state: OverlayState,
         store: LayoutStore,
         icons: IconProvider,
         actions: OverlayActions
     ) {
         self.folder = folder
-        self.isVisible = isVisible
         self.metrics = metrics
-        self.grid = grid
         self.state = state
         self.store = store
         self.icons = icons
@@ -75,11 +67,7 @@ struct FolderPanelView: View {
                     isSelected: entry.index == state.folderSelection,
                     isFolderTarget: false,
                     style: metrics.tileStyle,
-                    dragContext: DragContext(
-                        source: .inFolder(folder.id, index: entry.index),
-                        grid: grid,
-                        folderPanel: metrics
-                    ),
+                    location: .inFolder(folder.id, index: entry.index),
                     store: store,
                     icons: icons,
                     actions: actions
@@ -93,14 +81,13 @@ struct FolderPanelView: View {
                     TilePosition(
                         state: state,
                         position: metrics.center(ofSlot: entry.displaySlot),
-                        followsDrag: entry.isDragged && isVisible
+                        followsDrag: entry.isDragged
                     )
                 )
                 .animation(.easeInOut(duration: 0.2), value: entry.displaySlot)
                 .animation(.easeOut(duration: 0.2), value: entry.isDragged)
             }
         }
-        .opacity(isVisible ? 1 : 0)
         .onChange(of: isNameFocused) { _, isFocused in
             state.isEditingFolderName = isFocused
             if !isFocused {

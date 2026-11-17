@@ -29,6 +29,8 @@ final class DragCoordinator {
     private var edgeTimer: Task<Void, Never>?
     private var edgeDirection = 0
     private var lastDragEnd = Date.distantPast
+    /// Where a press that hit no tile started, so moving that press drags nothing.
+    private var ignoredPressLocation: CGPoint?
 
     init(store: LayoutStore, state: OverlayState, showPage: @escaping (Int, () -> Void) -> Void) {
         self.store = store
@@ -42,9 +44,19 @@ final class DragCoordinator {
         state.drag != nil || Date.now.timeIntervalSince(lastDragEnd) < 0.3
     }
 
+    /// One step of the overlay's drag gesture. The first step finds the tile under the press. A press that hit no
+    /// tile drags nothing.
     func update(_ update: DragUpdate) {
         if state.drag == nil {
-            begin(update)
+            guard update.startLocation != ignoredPressLocation else {
+                return
+            }
+            guard let tile = grabbedTile(at: update.startLocation, grid: update.grid, folderPanel: update.folderPanel)
+            else {
+                ignoredPressLocation = update.startLocation
+                return
+            }
+            begin(tile, update)
         }
         guard var drag = state.drag else {
             return
@@ -81,6 +93,7 @@ final class DragCoordinator {
 
     /// Commits the drop.
     func end() {
+        ignoredPressLocation = nil
         guard let drag = state.drag else {
             return
         }
@@ -107,26 +120,64 @@ final class DragCoordinator {
         lastDragEnd = .now
     }
 
-    private func begin(_ update: DragUpdate) {
+    /// A tile under a press: where it sits, what it holds, and its center.
+    private struct GrabbedTile {
+        let source: LayoutLocation
+        let item: Item
+        let center: CGPoint
+    }
+
+    /// The tile whose cell contains a press. With a folder open, only the folder's apps can be grabbed, otherwise
+    /// the items of the current page. Search results cannot be dragged.
+    private func grabbedTile(at point: CGPoint, grid: GridMetrics, folderPanel: FolderPanelMetrics?) -> GrabbedTile? {
+        if let folderID = state.openFolderID {
+            guard
+                let folderPanel,
+                let folder = store.folder(withID: folderID),
+                let slot = folderPanel.slot(containing: point),
+                folder.apps.indices.contains(slot)
+            else {
+                return nil
+            }
+            return GrabbedTile(
+                source: .inFolder(folderID, index: slot),
+                item: .app(folder.apps[slot]),
+                center: folderPanel.center(ofSlot: slot)
+            )
+        }
+        let pages = store.layout.pages
+        guard
+            !state.isSearching,
+            let slot = grid.slot(containing: point),
+            pages.indices.contains(state.currentPage),
+            pages[state.currentPage].items.indices.contains(slot)
+        else {
+            return nil
+        }
+        return GrabbedTile(
+            source: .slot(GridPosition(page: state.currentPage, slot: slot)),
+            item: pages[state.currentPage].items[slot],
+            center: grid.center(ofSlot: slot)
+        )
+    }
+
+    private func begin(_ tile: GrabbedTile, _ update: DragUpdate) {
         var gapSlot: Int?
         var folderGapIndex: Int?
-        let tileCenter: CGPoint
-        switch update.source {
+        switch tile.source {
         case .slot(let position):
             // The dragged item's own slot shows the gap, so nothing moves until the dragged icon does.
             gapSlot = position.slot
-            tileCenter = update.grid.center(ofSlot: position.slot)
         case .inFolder(_, let index):
             folderGapIndex = index
-            tileCenter = update.folderPanel?.center(ofSlot: index) ?? update.startLocation
         }
         state.dragLocation = update.location
         state.drag = DragSession(
-            source: update.source,
-            item: update.item,
+            source: tile.source,
+            item: tile.item,
             grabOffset: CGSize(
-                width: tileCenter.x - update.startLocation.x,
-                height: tileCenter.y - update.startLocation.y
+                width: tile.center.x - update.startLocation.x,
+                height: tile.center.y - update.startLocation.y
             ),
             page: state.currentPage,
             gapSlot: gapSlot,

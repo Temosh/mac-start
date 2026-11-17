@@ -32,21 +32,13 @@ struct DragSession: Equatable {
     }
 }
 
-/// One step of a drag gesture, with the geometry needed to place it.
+/// One step of the overlay's drag gesture, with the geometry needed to find the grabbed tile and place the drag.
 struct DragUpdate {
-    let source: LayoutLocation
-    let item: Item
     let location: CGPoint
     /// The pointer where the drag started.
     let startLocation: CGPoint
     let grid: GridMetrics
-    let folderPanel: FolderPanelMetrics?
-}
-
-/// What a draggable tile needs to report its drag.
-struct DragContext {
-    let source: LayoutLocation
-    let grid: GridMetrics
+    /// The open folder's panel, if a folder is open.
     let folderPanel: FolderPanelMetrics?
 }
 
