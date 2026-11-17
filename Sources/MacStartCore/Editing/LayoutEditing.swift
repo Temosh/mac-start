@@ -121,6 +121,25 @@ extension Layout {
         )
     }
 
+    /// Moves the given apps out of a folder into the slots right after it, in the folder's order. Apps that are
+    /// not in the folder stay where they are. A folder left with one app dissolves into it.
+    public mutating func removeApps(_ apps: Set<AppID>, fromFolder id: UUID, pageCapacity: Int) {
+        guard
+            let position = position(ofFolder: id),
+            case .folder(var folder) = pages[position.page].items[position.slot]
+        else {
+            return
+        }
+        let removed = folder.apps.filter(apps.contains)
+        guard !removed.isEmpty else {
+            return
+        }
+        folder.apps.removeAll(where: apps.contains)
+        pages[position.page].items[position.slot] = .folder(folder)
+        pages[position.page].items.insert(contentsOf: removed.map(Item.app), at: position.slot + 1)
+        pages = Self.normalized(pages, pageCapacity: pageCapacity)
+    }
+
     /// Reorders an app inside its folder. `destination` counts without the moved app.
     public mutating func moveApp(inFolder id: UUID, from index: Int, to destination: Int) {
         guard

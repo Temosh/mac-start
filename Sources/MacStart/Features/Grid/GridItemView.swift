@@ -52,6 +52,7 @@ struct GridItemView: View {
                 isSelected: isSelected,
                 isHighlighted: isFolderTarget,
                 editMark: editMark,
+                onBadgeTap: { actions.select(item) },
                 style: style
             ) {
                 Image(nsImage: icons.icon(for: app, side: style.iconSize))
@@ -81,12 +82,23 @@ struct GridItemView: View {
         }
         .accessibilityLabel(subtitle.map { "\(app.displayName), version \($0)" } ?? app.displayName)
         .accessibilityAddTraits(isMarkedSelected ? .isSelected : [])
+        .accessibilityActions { selectAction }
     }
 
     /// Moves just this item to the end of a page.
     private var moveToPageMenu: some View {
         Menu("Move to Page") {
             PageMenuItems(pageCount: pageCount) { actions.moveItems([item.id], $0) }
+        }
+    }
+
+    /// In edit mode, VoiceOver can select the tile directly, since activating a folder opens it.
+    @ViewBuilder
+    private var selectAction: some View {
+        if let editMark {
+            Button(editMark == .selected ? "Deselect" : "Select") {
+                actions.select(item)
+            }
         }
     }
 
@@ -105,6 +117,7 @@ struct GridItemView: View {
                 isSelected: isSelected,
                 isHighlighted: isFolderTarget,
                 editMark: editMark,
+                onBadgeTap: { actions.select(item) },
                 style: style
             ) {
                 FolderIcon(apps: folder.apps.compactMap { store.app(for: $0) }, icons: icons)
@@ -121,6 +134,7 @@ struct GridItemView: View {
         }
         .accessibilityLabel("\(folder.name) folder")
         .accessibilityAddTraits(isMarkedSelected ? .isSelected : [])
+        .accessibilityActions { selectAction }
     }
 }
 
@@ -133,6 +147,8 @@ struct TileLabel<Icon: View>: View {
     let isHighlighted: Bool
     /// The tile's mark in edit mode, or nil outside it.
     let editMark: EditMark?
+    /// Selects the tile from its edit mode badge.
+    let onBadgeTap: (@MainActor () -> Void)?
     let style: TileStyle
     let icon: Icon
 
@@ -144,6 +160,7 @@ struct TileLabel<Icon: View>: View {
         isSelected: Bool,
         isHighlighted: Bool = false,
         editMark: EditMark? = nil,
+        onBadgeTap: (@MainActor () -> Void)? = nil,
         style: TileStyle,
         @ViewBuilder icon: () -> Icon
     ) {
@@ -152,6 +169,7 @@ struct TileLabel<Icon: View>: View {
         self.isSelected = isSelected
         self.isHighlighted = isHighlighted
         self.editMark = editMark
+        self.onBadgeTap = onBadgeTap
         self.style = style
         self.icon = icon()
     }
@@ -163,7 +181,7 @@ struct TileLabel<Icon: View>: View {
                 .frame(width: style.iconSize, height: style.iconSize)
                 .overlay(alignment: .topLeading) {
                     if let editMark {
-                        EditBadge(mark: editMark, iconSize: style.iconSize)
+                        EditBadge(mark: editMark, iconSize: style.iconSize) { onBadgeTap?() }
                     }
                 }
             // The shadow is on the text only: a shadow of every icon is the costliest part of a moving grid.

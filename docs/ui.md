@@ -39,12 +39,13 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 | Right-click app | Context menu: Hide, Show in Finder, Move to Page, Remove from Folder (in folders) |
 | Right-click folder | Context menu: Move to Page |
 | Move to Page | Lists every page and New Page. Moves the item to the end of that page, closes an open folder, and shows the page |
-| Right-click a selected item in edit mode | Context menu for the whole selection: New Folder with Selection, Move Selection to Page, Hide Selection, Deselect All |
+| Right-click a selected item in edit mode | Context menu for the whole selection: New Folder with Selection, Move Selection to Page, Remove Selection from Folder (inside a folder), Hide Selection, Deselect All |
 | Right-click empty area | Context menu: Settings… |
-| Edit button, or `⌘`-click an item | Enters edit mode. `⌘`-click also selects that item. Entering edit mode closes an open folder |
-| Click item in edit mode | Selects or deselects it instead of opening it. `⇧`-click selects every item from the last clicked one, in reading order. Return selects the keyboard-selected item. Selected items show a checkmark badge and an accent highlight; the selection stays across pages and searches |
+| Edit button, or `⌘`-click an item | Enters edit mode, also inside an open folder. `⌘`-click also selects that item |
+| Open a folder in edit mode | A click opens it, as outside edit mode. Inside, a click, `⇧`-click, `⌘A`, and Return select its apps. Escape or a click outside the panel closes the folder and keeps edit mode |
+| Click item in edit mode | A click on an app selects or deselects it instead of launching it. A click on a folder opens it, and a click on any item's round badge selects or deselects it. `⇧`-click selects every item from the last clicked one, in reading order. Return selects the keyboard-selected item. Selected items show a checkmark badge and an accent highlight; the selection stays across pages and searches |
 | `⌘A` in edit mode | Selects every item on the current page, or every search result. Outside edit mode it selects the search text |
-| Edit action bar | Shows above the page dots in edit mode, with the selection count. New Folder groups the selected apps where the first of them is; it needs two or more apps and no folders. Move to Page moves the selected items to the end of a page or a new page, then shows that page. Hide works on apps only. Deselect All clears the selection |
+| Edit action bar | Shows above the page dots in edit mode, with the selection count. New Folder groups the selected apps where the first of them is; it needs two or more apps and no folders. Move to Page moves the selected items to the end of a page or a new page, then shows that page. Hide works on apps only. Deselect All clears the selection. Inside an open folder, Remove from Folder puts the folder's selected apps right after it |
 | Done | Leaves edit mode |
 | `⌘,` | Opens Settings, also while the overlay is open |
 | Losing focus (app switch, Space change) | Closes the overlay |

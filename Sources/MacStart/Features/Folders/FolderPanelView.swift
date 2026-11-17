@@ -66,8 +66,9 @@ struct FolderPanelView: View {
                     item: .app(entry.app.id),
                     isSelected: entry.index == state.folderSelection,
                     isFolderTarget: false,
-                    editMark: nil,
-                    selectionSummary: nil,
+                    editMark: editMark(for: entry.app.id),
+                    selectionSummary: editMark(for: entry.app.id) == .selected
+                        ? EditSelectionSummary(state.editSelection, openFolder: folder) : nil,
                     style: metrics.tileStyle,
                     location: .inFolder(folder.id, index: entry.index),
                     pageCount: store.layout.pages.count,
@@ -109,6 +110,14 @@ struct FolderPanelView: View {
         if draftName != folder.name {
             actions.renameFolder(folder.id, draftName)
         }
+    }
+
+    /// The app's mark in edit mode, or nil outside it.
+    private func editMark(for app: AppID) -> EditMark? {
+        guard state.isEditing else {
+            return nil
+        }
+        return state.editSelection.contains(.app(app)) ? .selected : .unselected
     }
 
     private struct Entry {

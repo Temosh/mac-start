@@ -81,6 +81,7 @@ Every edit is followed by reconcile, so the invariants always hold. Positions co
 - "Remove from Folder" puts the app into the slot right after the folder. A folder left with one app dissolves into that app.
 - Moving several items to a page appends them to its end in reading order: page by page and slot by slot, with the apps of a folder in the folder's order. Apps leave their folders. A page one past the last adds a page, and overflow cascades.
 - Making a folder of several apps puts it where the first of them is in reading order: in that app's slot, or right after the folder that holds it. It needs two or more placed apps. It is named after the first App Store category among them, else "Folder".
+- Removing several apps from a folder puts them into the slots right after it, in the folder's order. Apps elsewhere stay where they are.
 - Renaming trims surrounding whitespace; an empty name keeps the old one.
 - Hiding adds the app to the hidden set, and reconcile takes it out of its slot or folder. Unhiding removes it from the set, and reconcile appends it to the last page like a new app.
 - A global shortcut needs Command, Option, or Control, unless its key is a function key (F1–F20), so it never takes a key away from typing.

@@ -8,6 +8,8 @@ enum EditAction {
     /// Moves the selected items to the end of a page. One past the last page makes a new page.
     case moveToPage(Int)
     case hide
+    /// Moves the selected apps of the open folder out, right after the folder.
+    case removeFromFolder
     case deselectAll
 }
 
@@ -15,8 +17,10 @@ enum EditAction {
 struct EditSelectionSummary: Equatable {
     let count: Int
     let hasOnlyApps: Bool
+    /// How many selected apps the open folder holds, or nil when no folder is open.
+    let countInOpenFolder: Int?
 
-    init(_ selection: Set<Item.ID>) {
+    init(_ selection: Set<Item.ID>, openFolder: Folder? = nil) {
         count = selection.count
         hasOnlyApps = selection.allSatisfy {
             if case .app = $0 {
@@ -24,6 +28,12 @@ struct EditSelectionSummary: Equatable {
             }
             return false
         }
+        countInOpenFolder = openFolder.map { folder in folder.apps.count { selection.contains(.app($0)) } }
+    }
+
+    /// Why Remove from Folder is unavailable, or nil when it is available.
+    var removeFromFolderHelp: String? {
+        (countInOpenFolder ?? 0) > 0 ? nil : "Select apps in this folder first"
     }
 
     /// Why New Folder is unavailable, or nil when it is available.
@@ -73,6 +83,12 @@ struct SelectionMenuItems: View {
         Menu("Move Selection to Page") {
             PageMenuItems(pageCount: pageCount) { perform(.moveToPage($0)) }
         }
+        if summary.countInOpenFolder != nil {
+            Button("Remove Selection from Folder") {
+                perform(.removeFromFolder)
+            }
+            .disabled(summary.removeFromFolderHelp != nil)
+        }
         Button("Hide Selection") {
             perform(.hide)
         }
@@ -87,12 +103,14 @@ struct SelectionMenuItems: View {
 /// The bar above the page dots in edit mode: how many items are selected, and what to do with them.
 struct EditActionBar: View {
     let selection: Set<Item.ID>
+    /// The open folder, whose apps can be taken out with Remove from Folder.
+    let openFolder: Folder?
     let pageCount: Int
     let isHighContrast: Bool
     let perform: @MainActor (EditAction) -> Void
 
     var body: some View {
-        let summary = EditSelectionSummary(selection)
+        let summary = EditSelectionSummary(selection, openFolder: openFolder)
         HStack(spacing: 2) {
             Text(selection.isEmpty ? "Click items to select them" : "\(selection.count) selected")
                 .foregroundStyle(.white.opacity(isHighContrast ? 0.95 : 0.75))
@@ -105,6 +123,16 @@ struct EditActionBar: View {
             }
             .disabled(summary.newFolderHelp != nil)
             moveMenu
+            if openFolder != nil {
+                barButton(
+                    "Remove from Folder",
+                    systemImage: "folder.badge.minus",
+                    help: summary.removeFromFolderHelp
+                ) {
+                    perform(.removeFromFolder)
+                }
+                .disabled(summary.removeFromFolderHelp != nil)
+            }
             barButton("Hide", systemImage: "eye.slash", help: summary.hideHelp) {
                 perform(.hide)
             }

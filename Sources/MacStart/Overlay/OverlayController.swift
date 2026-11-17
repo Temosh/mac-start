@@ -274,7 +274,9 @@ final class OverlayController: NSObject, NSWindowDelegate {
                         return true
                     }
                     // In edit mode, Command-A selects items. Otherwise it selects the search text.
-                    if isSelectAllShortcut, self.state.isEditing, self.state.drag == nil {
+                    if isSelectAllShortcut, self.state.isEditing, !self.state.isEditingFolderName,
+                        self.state.drag == nil
+                    {
                         self.selectAllShown()
                         return true
                     }
@@ -402,8 +404,12 @@ final class OverlayController: NSObject, NSWindowDelegate {
             return
         }
         let modifiers = NSEvent.modifierFlags
-        // Inside an open folder a click always opens: edit mode works on the grid and the search results.
-        if state.openFolderID == nil, state.isEditing || modifiers.contains(.command) {
+        if state.isEditing, case .folder(let folder) = item, !modifiers.contains(.shift) {
+            // In edit mode a click opens a folder, as outside it. The folder's badge selects it.
+            openFolder(folder.id)
+            return
+        }
+        if state.isEditing || modifiers.contains(.command) {
             if !state.isEditing {
                 beginEditing()
             }
@@ -415,6 +421,19 @@ final class OverlayController: NSObject, NSWindowDelegate {
             return
         }
         open(item)
+    }
+
+    /// A click on a tile's badge in edit mode: selects or deselects the tile, and Shift selects the range from the
+    /// last clicked tile.
+    private func select(_ item: Item) {
+        guard state.isEditing else {
+            return
+        }
+        if NSEvent.modifierFlags.contains(.shift) {
+            extendEditSelection(to: item.id)
+        } else {
+            toggleEditSelection(item.id)
+        }
     }
 
     /// Launches an app or opens a folder. In edit mode it selects the item instead.
@@ -443,9 +462,8 @@ final class OverlayController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Enters edit mode. An open folder closes, because edit mode works on the grid and the search results.
+    /// Enters edit mode. An open folder stays open, and its apps can be selected.
     private func beginEditing() {
-        state.closeFolder()
         state.isEditing = true
     }
 
@@ -477,18 +495,32 @@ final class OverlayController: NSObject, NSWindowDelegate {
 
     /// The items edit mode can select, in the order the overlay shows them: the search results, or every page.
     private var shownItemIDs: [Item.ID] {
+        if let folder = openFolder {
+            return folder.apps.map { .app($0) }
+        }
         if state.isSearching {
             return store.searchResults(matching: state.query).map { .app($0.id) }
         }
         return store.layout.pages.flatMap(\.items).map(\.id)
     }
 
-    /// Selects every search result, or every item on the current page.
+    /// Selects every app of the open folder, every search result, or every item on the current page.
     private func selectAllShown() {
-        if state.isSearching {
+        if openFolder != nil || state.isSearching {
             state.editSelection.formUnion(shownItemIDs)
         } else if store.layout.pages.indices.contains(state.currentPage) {
             state.editSelection.formUnion(store.layout.pages[state.currentPage].items.map(\.id))
+        }
+    }
+
+    private var openFolder: Folder? {
+        state.openFolderID.flatMap { store.folder(withID: $0) }
+    }
+
+    /// Closes the open folder when an edit left it with fewer than two apps, so it no longer exists.
+    private func closeFolderIfGone() {
+        if state.openFolderID != nil, openFolder == nil {
+            closeFolder()
         }
     }
 
@@ -533,6 +565,14 @@ final class OverlayController: NSObject, NSWindowDelegate {
         case .hide:
             store.hide(apps)
             clearEditSelection()
+            closeFolderIfGone()
+        case .removeFromFolder:
+            guard let folderID = state.openFolderID else {
+                return
+            }
+            store.removeApps(apps, fromFolder: folderID)
+            clearEditSelection()
+            closeFolderIfGone()
         case .deselectAll:
             clearEditSelection()
         }
@@ -552,7 +592,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         }
         switch keyCode {
         case kVK_Return, kVK_ANSI_KeypadEnter:
-            launchFolderSelection()
+            openFolderSelection()
         case kVK_LeftArrow:
             moveFolderSelection(.left)
         case kVK_RightArrow:
@@ -593,17 +633,16 @@ final class OverlayController: NSObject, NSWindowDelegate {
         }
     }
 
-    private func launchFolderSelection() {
+    /// Return in a folder launches the selected app, or selects it in edit mode.
+    private func openFolderSelection() {
         guard
-            let folderID = state.openFolderID,
-            let folder = store.folder(withID: folderID),
+            let folder = openFolder,
             let index = state.folderSelection,
-            folder.apps.indices.contains(index),
-            let app = store.app(for: folder.apps[index])
+            folder.apps.indices.contains(index)
         else {
             return
         }
-        launch(app)
+        open(.app(folder.apps[index]))
     }
 
     /// Shows the app in Finder. Finder takes the focus, which closes the overlay.
@@ -765,11 +804,15 @@ final class OverlayController: NSObject, NSWindowDelegate {
             moveItems: { [weak self] ids, page in self?.moveItems(ids, toPage: page) },
             closeFolder: { [weak self] in self?.closeFolder() },
             renameFolder: { [weak self] id, name in self?.store.renameFolder(id, to: name) },
-            removeFromFolder: { [weak self] id, index in self?.store.removeApp(fromFolder: id, at: index) },
+            removeFromFolder: { [weak self] id, index in
+                self?.store.removeApp(fromFolder: id, at: index)
+                self?.closeFolderIfGone()
+            },
             showInFinder: { [weak self] app in self?.showInFinder(app) },
             hide: { [weak self] app in self?.store.hide(app.id) },
             openSettings: openSettings,
             toggleEditing: { [weak self] in self?.toggleEditing() },
+            select: { [weak self] item in self?.select(item) },
             performEdit: { [weak self] action in self?.performEdit(action) },
             dragChanged: { [weak self] update in self?.drags.update(update) },
             dragEnded: { [weak self] in self?.drags.end() }

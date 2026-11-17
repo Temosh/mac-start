@@ -67,6 +67,38 @@ struct BatchEditingTests {
         #expect(layout == original)
     }
 
+    // MARK: - Remove from folder
+
+    @Test func removesAppsFromAFolderIntoTheSlotsAfterItInFolderOrder() {
+        let folder = Folder(name: "Four", apps: [a, b, c, d])
+        let e = appID("E")
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(e)])])
+
+        layout.removeApps([d, b], fromFolder: folder.id, pageCapacity: capacity)
+
+        let rest = Folder(id: folder.id, name: "Four", apps: [a, c])
+        #expect(layout.pages == [Page(items: [.folder(rest), .app(b), .app(d), .app(e)])])
+    }
+
+    @Test func aFolderLeftWithOneAppDissolvesWhenAppsLeaveIt() {
+        let folder = Folder(name: "Three", apps: [a, b, c])
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(d)])])
+
+        layout.removeApps([a, c], fromFolder: folder.id, pageCapacity: capacity)
+
+        #expect(layout.pages == [Page(items: [.app(b), .app(a), .app(c), .app(d)])])
+    }
+
+    @Test func appsOutsideTheFolderStayAndRemovedAppsThatDoNotFitMoveOn() {
+        let folder = Folder(name: "Three", apps: [a, b, c])
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(d)])])
+
+        layout.removeApps([a, d], fromFolder: folder.id, pageCapacity: 2)
+
+        let rest = Folder(id: folder.id, name: "Three", apps: [b, c])
+        #expect(layout.pages == [Page(items: [.folder(rest), .app(a)]), Page(items: [.app(d)])])
+    }
+
     // MARK: - New folder
 
     @Test func makesAFolderInTheSlotOfTheFirstAppInReadingOrder() throws {

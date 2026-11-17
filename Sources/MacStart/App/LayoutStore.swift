@@ -88,6 +88,11 @@ final class LayoutStore {
         edit { $0.removeApp(fromFolder: id, at: index, pageCapacity: preferences.pageCapacity) }
     }
 
+    /// Moves several apps out of a folder, into the slots right after it.
+    func removeApps(_ apps: Set<AppID>, fromFolder id: UUID) {
+        edit { $0.removeApps(apps, fromFolder: id, pageCapacity: preferences.pageCapacity) }
+    }
+
     /// Reorders an app inside its folder.
     func moveApp(inFolder id: UUID, from index: Int, to destination: Int) {
         edit { $0.moveApp(inFolder: id, from: index, to: destination) }

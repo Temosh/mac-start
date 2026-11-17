@@ -17,6 +17,8 @@ struct OverlayActions {
     let openSettings: @MainActor () -> Void
     /// Enters or leaves edit mode.
     let toggleEditing: @MainActor () -> Void
+    /// Selects or deselects an item in edit mode, as a click on its badge does.
+    let select: @MainActor (Item) -> Void
     let performEdit: @MainActor (EditAction) -> Void
     let dragChanged: @MainActor (DragUpdate) -> Void
     let dragEnded: @MainActor () -> Void
@@ -64,6 +66,8 @@ struct OverlayView: View {
                     .padding(.trailing, geometry.size.width - metrics.toolbarTrailingX)
                     .frame(width: geometry.size.width, alignment: .trailing)
                     .position(x: geometry.size.width / 2, y: metrics.toolbarCenterY)
+                // Over the folder panel, so edit mode works inside an open folder.
+                editBar(metrics: metrics)
                 DragLayer(state: state, style: metrics.tileStyle, store: store, icons: icons)
             }
             // One drag gesture for the whole overlay. The drag coordinator finds the tile under the press, so the
@@ -143,28 +147,46 @@ struct OverlayView: View {
         }
     }
 
-    /// The bottom of the overlay: the edit actions in edit mode, above the page dots of the grid.
+    private var showsPageDots: Bool {
+        store.hasLoaded && !state.isSearching && !store.layout.placedAppIDs.isEmpty && store.layout.pages.count > 1
+    }
+
+    private var pageDots: some View {
+        PageIndicator(
+            pageCount: store.layout.pages.count,
+            currentPage: state.currentPage,
+            isHighContrast: contrast == .increased,
+            select: { actions.showPage($0) }
+        )
+    }
+
+    /// The page dots at the bottom of the overlay.
     private func bottomBar(metrics: GridMetrics) -> some View {
-        let showsPageDots =
-            store.hasLoaded && !state.isSearching && !store.layout.placedAppIDs.isEmpty
-            && store.layout.pages.count > 1
-        return VStack(spacing: 10) {
+        VStack {
+            Spacer()
+            if showsPageDots {
+                pageDots
+            }
+        }
+        .padding(.bottom, metrics.bottomInset * 0.35)
+    }
+
+    /// The edit actions in edit mode, right above the page dots.
+    private func editBar(metrics: GridMetrics) -> some View {
+        VStack(spacing: 10) {
             Spacer()
             if state.isEditing {
                 EditActionBar(
                     selection: state.editSelection,
+                    openFolder: state.openFolderID.flatMap { store.folder(withID: $0) },
                     pageCount: store.layout.pages.count,
                     isHighContrast: contrast == .increased,
                     perform: actions.performEdit
                 )
-            }
-            if showsPageDots {
-                PageIndicator(
-                    pageCount: store.layout.pages.count,
-                    currentPage: state.currentPage,
-                    isHighContrast: contrast == .increased,
-                    select: { actions.showPage($0) }
-                )
+                // Holds the place of the page dots, which sit under the folder panel.
+                if showsPageDots {
+                    pageDots.hidden()
+                }
             }
         }
         .padding(.bottom, metrics.bottomInset * 0.35)
