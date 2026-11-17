@@ -192,20 +192,32 @@ final class OverlayController: NSObject, NSWindowDelegate {
 
     /// Moves to a page, clamped to the existing pages, with a spring from wherever a swipe left the pages.
     /// `velocity` is how fast the pages were moving, in points per second, so the spring carries a flick on
-    /// instead of starting from rest. `changes` run in the same transaction as the page turn. A change made just
-    /// before it, in a transaction of its own, could make SwiftUI draw the pager with the old page and then miss
-    /// the new one, so the pages stayed put.
+    /// instead of starting from rest. `changes` run in the same transaction as the page turn; see
+    /// `turnPage(initialVelocity:after:)`.
     func showPage(_ index: Int, velocity: CGFloat = 0, alongWith changes: () -> Void = {}) {
         let page = min(max(index, 0), max(store.layout.pages.count - 1, 0))
         let start = -CGFloat(state.currentPage) * panel.frame.width + state.pageOffset
         let distance = -CGFloat(page) * panel.frame.width - start
         // The spring takes its starting speed relative to the distance it covers.
         let relativeVelocity = abs(distance) >= 1 ? min(max(velocity / distance, -20), 20) : 0
-        let animation: Animation? =
-            Self.reduceMotion ? nil : .interpolatingSpring(Self.pageSpring, initialVelocity: relativeVelocity)
-        withAnimation(animation) {
+        turnPage(initialVelocity: relativeVelocity) {
             changes()
-            state.currentPage = page
+            return page
+        }
+    }
+
+    /// Makes `change`, which returns the page to show once it is made, and turns to that page in the same
+    /// transaction. A change made apart from the turn, just before it, could make SwiftUI draw the pager with the
+    /// old page and then miss the new one, so the pages stayed put.
+    private func turnPage(initialVelocity: CGFloat = 0, after change: () -> Int?) {
+        let animation: Animation? =
+            Self.reduceMotion ? nil : .interpolatingSpring(Self.pageSpring, initialVelocity: initialVelocity)
+        withAnimation(animation) {
+            guard let page = change() else {
+                return
+            }
+            // Clamped after the change, which can add or remove pages.
+            state.currentPage = min(max(page, 0), max(store.layout.pages.count - 1, 0))
             state.pageOffset = 0
         }
     }
@@ -251,13 +263,19 @@ final class OverlayController: NSObject, NSWindowDelegate {
                     .subtracting([.function, .numericPad, .capsLock])
                 // The overlay does not make MacStart the active app, so the menu bar never sees Command-Comma.
                 let isSettingsShortcut = modifiers == .command && event.charactersIgnoringModifiers == ","
+                let isSelectAllShortcut = modifiers == .command && event.charactersIgnoringModifiers == "a"
                 // Local monitors run on the main thread.
                 let isHandled = MainActor.assumeIsolated {
-                    guard let self else {
+                    guard let self, self.panel.isKeyWindow else {
                         return false
                     }
-                    if isSettingsShortcut, self.panel.isKeyWindow {
+                    if isSettingsShortcut {
                         self.openSettings()
+                        return true
+                    }
+                    // In edit mode, Command-A selects items. Otherwise it selects the search text.
+                    if isSelectAllShortcut, self.state.isEditing, self.state.drag == nil {
+                        self.selectAllShown()
                         return true
                     }
                     return self.handleKey(keyCode: keyCode, hasModifiers: !modifiers.isEmpty)
@@ -294,7 +312,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         }
         switch keyCode {
         case kVK_Escape:
-            clearSearchOrHide()
+            handleEscape()
         case kVK_Return, kVK_ANSI_KeypadEnter:
             activateSelection()
         case kVK_LeftArrow:
@@ -315,13 +333,24 @@ final class OverlayController: NSObject, NSWindowDelegate {
         (panel.firstResponder as? NSTextView)?.hasMarkedText() ?? false
     }
 
-    /// Escape clears the search first, and closes the overlay when there is nothing to clear.
-    private func clearSearchOrHide() {
-        if state.query.isEmpty {
-            hide()
-        } else {
+    /// Escape clears the search first, then leaves edit mode, and closes the overlay when nothing else is left.
+    private func handleEscape() {
+        if !state.query.isEmpty {
             state.query = ""
+        } else if state.isEditing {
+            state.endEditing()
+        } else {
+            hide()
         }
+    }
+
+    /// A click on empty space closes the overlay. In edit mode it does nothing, so a stray click keeps the
+    /// selection; Deselect All clears it.
+    private func dismiss() {
+        guard !state.isEditing else {
+            return
+        }
+        hide()
     }
 
     /// Moves the keyboard selection through the search results, or through the pages of the grid.
@@ -341,13 +370,14 @@ final class OverlayController: NSObject, NSWindowDelegate {
         showPage(next.page) { state.selection = next }
     }
 
-    /// Return launches the selected app. While searching, it launches the best result when nothing is selected.
+    /// Return opens the selected item, or selects it in edit mode. While searching, it opens the best result when
+    /// nothing is selected.
     private func activateSelection() {
         if state.isSearching {
             let results = store.searchResults(matching: state.query)
             let slot = state.selection?.slot ?? 0
             if results.indices.contains(slot) {
-                launch(results[slot])
+                open(.app(results[slot].id))
             }
             return
         }
@@ -362,13 +392,140 @@ final class OverlayController: NSObject, NSWindowDelegate {
         guard items.indices.contains(selection.slot) else {
             return
         }
-        switch items[selection.slot] {
+        open(items[selection.slot])
+    }
+
+    /// A click on a tile. In edit mode, or with Command, it selects the tile, and Shift selects the range from the
+    /// last clicked tile. Otherwise it launches the app or opens the folder.
+    private func click(_ item: Item) {
+        guard !drags.suppressesClick else {
+            return
+        }
+        let modifiers = NSEvent.modifierFlags
+        // Inside an open folder a click always opens: edit mode works on the grid and the search results.
+        if state.openFolderID == nil, state.isEditing || modifiers.contains(.command) {
+            if !state.isEditing {
+                beginEditing()
+            }
+            if modifiers.contains(.shift) {
+                extendEditSelection(to: item.id)
+            } else {
+                toggleEditSelection(item.id)
+            }
+            return
+        }
+        open(item)
+    }
+
+    /// Launches an app or opens a folder. In edit mode it selects the item instead.
+    private func open(_ item: Item) {
+        if state.isEditing {
+            toggleEditSelection(item.id)
+            return
+        }
+        switch item {
         case .app(let id):
             if let app = store.app(for: id) {
                 launch(app)
             }
         case .folder(let folder):
             openFolder(folder.id)
+        }
+    }
+
+    // MARK: - Edit mode
+
+    private func toggleEditing() {
+        if state.isEditing {
+            state.endEditing()
+        } else {
+            beginEditing()
+        }
+    }
+
+    /// Enters edit mode. An open folder closes, because edit mode works on the grid and the search results.
+    private func beginEditing() {
+        state.closeFolder()
+        state.isEditing = true
+    }
+
+    private func toggleEditSelection(_ id: Item.ID) {
+        if state.editSelection.remove(id) == nil {
+            state.editSelection.insert(id)
+        }
+        state.editSelectionAnchor = id
+    }
+
+    /// Selects every item from the last clicked one to `id`, in the order the overlay shows them.
+    private func extendEditSelection(to id: Item.ID) {
+        let order = shownItemIDs
+        guard
+            let anchor = state.editSelectionAnchor,
+            let start = order.firstIndex(of: anchor),
+            let end = order.firstIndex(of: id)
+        else {
+            toggleEditSelection(id)
+            return
+        }
+        state.editSelection.formUnion(order[min(start, end)...max(start, end)])
+    }
+
+    private func clearEditSelection() {
+        state.editSelection = []
+        state.editSelectionAnchor = nil
+    }
+
+    /// The items edit mode can select, in the order the overlay shows them: the search results, or every page.
+    private var shownItemIDs: [Item.ID] {
+        if state.isSearching {
+            return store.searchResults(matching: state.query).map { .app($0.id) }
+        }
+        return store.layout.pages.flatMap(\.items).map(\.id)
+    }
+
+    /// Selects every search result, or every item on the current page.
+    private func selectAllShown() {
+        if state.isSearching {
+            state.editSelection.formUnion(shownItemIDs)
+        } else if store.layout.pages.indices.contains(state.currentPage) {
+            state.editSelection.formUnion(store.layout.pages[state.currentPage].items.map(\.id))
+        }
+    }
+
+    /// Applies an edit action to the selected items, then clears the selection and shows where they went.
+    private func performEdit(_ action: EditAction) {
+        let selection = state.editSelection
+        let apps = Set(
+            selection.compactMap { id -> AppID? in
+                if case .app(let appID) = id {
+                    return appID
+                }
+                return nil
+            }
+        )
+        switch action {
+        case .newFolder:
+            turnPage {
+                guard let folderID = store.makeFolder(of: apps) else {
+                    return nil
+                }
+                clearEditSelection()
+                return store.layout.position(ofFolder: folderID)?.page
+            }
+        case .moveToPage(let page):
+            turnPage {
+                store.moveItems(selection, toPage: page)
+                clearEditSelection()
+                // Emptied pages are gone now, so the page of the first moved item tells where they went.
+                return store.layout.pages.firstIndex { candidate in
+                    candidate.items.contains { selection.contains($0.id) }
+                }
+            }
+        case .hide:
+            store.hide(apps)
+            clearEditSelection()
+        case .deselectAll:
+            clearEditSelection()
         }
     }
 
@@ -593,16 +750,17 @@ final class OverlayController: NSObject, NSWindowDelegate {
             self?.handleUnfocusedKey(event) ?? false
         }
         let actions = OverlayActions(
-            launch: { [weak self] app in self?.launch(app) },
-            dismiss: { [weak self] in self?.hide() },
+            click: { [weak self] item in self?.click(item) },
+            dismiss: { [weak self] in self?.dismiss() },
             showPage: { [weak self] page in self?.showPage(page) },
-            openFolder: { [weak self] id in self?.openFolder(id) },
             closeFolder: { [weak self] in self?.closeFolder() },
             renameFolder: { [weak self] id, name in self?.store.renameFolder(id, to: name) },
             removeFromFolder: { [weak self] id, index in self?.store.removeApp(fromFolder: id, at: index) },
             showInFinder: { [weak self] app in self?.showInFinder(app) },
             hide: { [weak self] app in self?.store.hide(app.id) },
             openSettings: openSettings,
+            toggleEditing: { [weak self] in self?.toggleEditing() },
+            performEdit: { [weak self] action in self?.performEdit(action) },
             dragChanged: { [weak self] update in self?.drags.update(update) },
             dragEnded: { [weak self] in self?.drags.end() }
         )

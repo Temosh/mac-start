@@ -12,7 +12,7 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 
 ## Layout
 
-- A search field is centered at the top, halfway between the top of the screen and the first row of icons. A round Settings button sits on the same line, ending at the right edge of the last column's icons.
+- A search field is centered at the top, halfway between the top of the screen and the first row of icons. Round Edit and Settings buttons sit on the same line, ending at the right edge of the last column's icons. In edit mode, Edit becomes a Done button in the accent color.
 - The paged grid fills the middle. Each item shows the app icon with its name below, truncated with an ellipsis. Apps that share a name also show their version below it.
 - Page indicator dots sit at the bottom. Clicking a dot jumps to that page.
 - The default grid is 7 columns by 5 rows. Both are configurable in Settings.
@@ -23,8 +23,8 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 |--------|--------|
 | Hotkey (default `⌥S`) | Toggles the overlay |
 | Click Dock icon | Toggles the overlay |
-| Escape | Cancels a drag, else closes an open folder, else clears the search text, else closes the overlay |
-| Click on empty area | Closes the overlay |
+| Escape | Cancels a drag, else closes an open folder, else clears the search text, else leaves edit mode, else closes the overlay |
+| Click on empty area | Closes the overlay. In edit mode it does nothing, so the selection stays |
 | Click app | Launches it and closes the overlay |
 | Horizontal two-finger swipe, scroll wheel, or arrow keys at the page edge | Changes page. A swipe moves the pages with the fingers; a short flick, or a slow swipe over 8% of the screen width, turns the page, and a spring settles it. Past the first or last page the pages stretch a little and spring back. A mouse wheel turns one page per notch |
 | Typing | Goes to the search field, which has the focus while the overlay is open, and replaces the pages with one grid of the best results. Hidden apps are excluded |
@@ -38,6 +38,11 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 | Drag app out of folder panel | Closes the folder; the drop removes the app from the folder and places it in the grid, or in another folder |
 | Right-click app | Context menu: Hide, Show in Finder, Remove from Folder (in folders) |
 | Right-click empty area | Context menu: Settings… |
+| Edit button, or `⌘`-click an item | Enters edit mode. `⌘`-click also selects that item. Entering edit mode closes an open folder |
+| Click item in edit mode | Selects or deselects it instead of opening it. `⇧`-click selects every item from the last clicked one, in reading order. Return selects the keyboard-selected item. Selected items show a checkmark badge and an accent highlight; the selection stays across pages and searches |
+| `⌘A` in edit mode | Selects every item on the current page, or every search result. Outside edit mode it selects the search text |
+| Edit action bar | Shows above the page dots in edit mode, with the selection count. New Folder groups the selected apps where the first of them is; it needs two or more apps and no folders. Move to Page moves the selected items to the end of a page or a new page, then shows that page. Hide works on apps only. Deselect All clears the selection |
+| Done | Leaves edit mode |
 | `⌘,` | Opens Settings, also while the overlay is open |
 | Losing focus (app switch, Space change) | Closes the overlay |
 

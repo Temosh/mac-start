@@ -12,6 +12,12 @@ extension Folder {
     public static func defaultName(target: InstalledApp?, dropped: InstalledApp?) -> String {
         target?.categoryName ?? dropped?.categoryName ?? "Folder"
     }
+
+    /// The name for a new folder made from several apps: the category of the first app that has one, else
+    /// "Folder".
+    public static func defaultName(for apps: [InstalledApp]) -> String {
+        apps.lazy.compactMap(\.categoryName).first ?? "Folder"
+    }
 }
 
 /// Edits from dragging and the folder panel. Each edit leaves the layout normalized: folders with fewer than 2
@@ -127,6 +133,82 @@ extension Layout {
         let app = folder.apps.remove(at: index)
         folder.apps.insert(app, at: min(max(destination, 0), folder.apps.count))
         pages[position.page].items[position.slot] = .folder(folder)
+    }
+
+    /// Moves the items with the given identifiers to the end of `page`, in reading order: page by page and slot by
+    /// slot, with the apps of a folder in the folder's order. An app inside a folder leaves the folder. A page one
+    /// past the last page adds a page, and items that do not fit move on to the next page.
+    public mutating func moveItems(_ ids: Set<Item.ID>, toPage page: Int, pageCapacity: Int) {
+        var moved: [Item] = []
+        for pageIndex in pages.indices {
+            var kept: [Item] = []
+            for item in pages[pageIndex].items {
+                if ids.contains(item.id) {
+                    moved.append(item)
+                    continue
+                }
+                if case .folder(var folder) = item {
+                    moved += folder.apps.filter { ids.contains(.app($0)) }.map(Item.app)
+                    folder.apps.removeAll { ids.contains(.app($0)) }
+                    kept.append(.folder(folder))
+                } else {
+                    kept.append(item)
+                }
+            }
+            pages[pageIndex].items = kept
+        }
+        guard !moved.isEmpty else {
+            return
+        }
+        // Emptied pages stay until normalizing, so `page` still counts the pages as they were.
+        let target = min(max(page, 0), pages.count)
+        if target == pages.count {
+            pages.append(Page())
+        }
+        pages[target].items += moved
+        pages = Self.normalized(pages, pageCapacity: pageCapacity)
+    }
+
+    /// Makes a folder of the given apps, in reading order, where the first of them is: in that app's slot, or right
+    /// after the folder that holds it. `name` names the folder from its apps. Returns the folder's identifier, or
+    /// nil when fewer than 2 of the apps are placed.
+    @discardableResult
+    public mutating func makeFolder(
+        of apps: Set<AppID>,
+        named name: (_ apps: [AppID]) -> String,
+        pageCapacity: Int
+    ) -> UUID? {
+        let ordered = pages.flatMap(\.items).flatMap(\.appIDs).filter(apps.contains)
+        guard ordered.count >= 2 else {
+            return nil
+        }
+        let folder = Folder(name: name(ordered), apps: ordered)
+        var isPlaced = false
+        for pageIndex in pages.indices {
+            var kept: [Item] = []
+            for item in pages[pageIndex].items {
+                switch item {
+                case .app(let id) where apps.contains(id):
+                    if !isPlaced {
+                        kept.append(.folder(folder))
+                        isPlaced = true
+                    }
+                case .folder(var existing):
+                    let holdsFirstApp = !isPlaced && existing.apps.contains(where: apps.contains)
+                    existing.apps.removeAll(where: apps.contains)
+                    kept.append(.folder(existing))
+                    if holdsFirstApp {
+                        kept.append(.folder(folder))
+                        isPlaced = true
+                    }
+                case .app:
+                    kept.append(item)
+                }
+            }
+            pages[pageIndex].items = kept
+        }
+        pages = Self.normalized(pages, pageCapacity: pageCapacity)
+        return folder.id
     }
 
     /// Hides an app. Reconcile then takes it out of its slot or folder, because hidden wins over placement.

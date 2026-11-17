@@ -25,7 +25,7 @@ struct FolderPanelMetrics: Equatable {
         tileStyle = TileStyle(
             iconSize: (grid.iconSize * scale).rounded(),
             labelFontSize: max((grid.labelFontSize * scale).rounded(), 10),
-            maxLabelWidth: cellSize.width * 0.92
+            width: cellSize.width * 0.9
         )
         let contentWidth = CGFloat(columns) * cellSize.width
         let width = max(contentWidth + 2 * Self.padding, 360)

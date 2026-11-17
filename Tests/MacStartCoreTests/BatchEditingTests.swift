@@ -1,0 +1,142 @@
+import Foundation
+import MacStartCore
+import Testing
+
+@Suite("Batch editing")
+struct BatchEditingTests {
+    let a = appID("A")
+    let b = appID("B")
+    let c = appID("C")
+    let d = appID("D")
+    let capacity = 35
+
+    private func ids(_ items: Item...) -> Set<Item.ID> {
+        Set(items.map(\.id))
+    }
+
+    // MARK: - Move to page
+
+    @Test func movesItemsToTheEndOfAPageInReadingOrder() {
+        var layout = Layout(pages: [Page(items: [.app(a), .app(b)]), Page(items: [.app(c), .app(d)])])
+
+        layout.moveItems(ids(.app(c), .app(a)), toPage: 1, pageCapacity: capacity)
+
+        #expect(layout.pages == [Page(items: [.app(b)]), Page(items: [.app(d), .app(a), .app(c)])])
+    }
+
+    @Test func aPageOnePastTheLastAddsAPage() {
+        var layout = Layout(pages: [Page(items: [.app(a), .app(b), .app(c)])])
+
+        layout.moveItems(ids(.app(b)), toPage: 1, pageCapacity: capacity)
+
+        #expect(layout.pages == [Page(items: [.app(a), .app(c)]), Page(items: [.app(b)])])
+    }
+
+    @Test func movesAWholeFolder() {
+        let folder = Folder(name: "Pair", apps: [a, b])
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(c)]), Page(items: [.app(d)])])
+
+        layout.moveItems(ids(.folder(folder)), toPage: 1, pageCapacity: capacity)
+
+        #expect(layout.pages == [Page(items: [.app(c)]), Page(items: [.app(d), .folder(folder)])])
+    }
+
+    @Test func anAppMovedOutOfAFolderLeavesItAndAFolderWithOneAppDissolves() {
+        let folder = Folder(name: "Pair", apps: [a, b])
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(c)])])
+
+        layout.moveItems(ids(.app(a)), toPage: 1, pageCapacity: capacity)
+
+        #expect(layout.pages == [Page(items: [.app(b), .app(c)]), Page(items: [.app(a)])])
+    }
+
+    @Test func itemsThatDoNotFitMoveOnAndAnEmptiedPageGoesAway() {
+        var layout = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(b), .app(c)])])
+
+        layout.moveItems(ids(.app(b), .app(c)), toPage: 0, pageCapacity: 2)
+
+        #expect(layout.pages == [Page(items: [.app(a), .app(b)]), Page(items: [.app(c)])])
+    }
+
+    @Test func unknownItemsChangeNothing() {
+        let original = Layout(pages: [Page(items: [.app(a), .app(b)])])
+        var layout = original
+
+        layout.moveItems(ids(.app(d)), toPage: 0, pageCapacity: capacity)
+
+        #expect(layout == original)
+    }
+
+    // MARK: - New folder
+
+    @Test func makesAFolderInTheSlotOfTheFirstAppInReadingOrder() throws {
+        var layout = Layout(pages: [Page(items: [.app(a), .app(b), .app(c), .app(d)])])
+        var namedApps: [AppID] = []
+
+        let id = layout.makeFolder(
+            of: [c, a],
+            named: { apps in
+                namedApps = apps
+                return "New"
+            },
+            pageCapacity: capacity
+        )
+
+        let folder = Folder(id: try #require(id), name: "New", apps: [a, c])
+        #expect(layout.pages == [Page(items: [.folder(folder), .app(b), .app(d)])])
+        #expect(namedApps == [a, c])
+    }
+
+    @Test func gathersAppsFromSeveralPages() throws {
+        var layout = Layout(pages: [Page(items: [.app(a), .app(b)]), Page(items: [.app(c)])])
+
+        let id = layout.makeFolder(of: [a, c], named: { _ in "New" }, pageCapacity: capacity)
+
+        let folder = Folder(id: try #require(id), name: "New", apps: [a, c])
+        #expect(layout.pages == [Page(items: [.folder(folder), .app(b)])])
+    }
+
+    @Test func aFirstAppInsideAFolderPutsTheNewFolderRightAfterThatFolder() throws {
+        let existing = Folder(name: "Old", apps: [a, b, c])
+        var layout = Layout(pages: [Page(items: [.folder(existing), .app(d)])])
+
+        let id = layout.makeFolder(of: [b, d], named: { _ in "New" }, pageCapacity: capacity)
+
+        let rest = Folder(id: existing.id, name: "Old", apps: [a, c])
+        let folder = Folder(id: try #require(id), name: "New", apps: [b, d])
+        #expect(layout.pages == [Page(items: [.folder(rest), .folder(folder)])])
+    }
+
+    @Test func aFolderLeftWithOneAppDissolves() throws {
+        let existing = Folder(name: "Old", apps: [a, b])
+        var layout = Layout(pages: [Page(items: [.folder(existing), .app(c)])])
+
+        let id = layout.makeFolder(of: [a, c], named: { _ in "New" }, pageCapacity: capacity)
+
+        let folder = Folder(id: try #require(id), name: "New", apps: [a, c])
+        #expect(layout.pages == [Page(items: [.app(b), .folder(folder)])])
+    }
+
+    @Test func fewerThanTwoPlacedAppsMakeNoFolder() {
+        let original = Layout(pages: [Page(items: [.app(a), .app(b)])])
+        var layout = original
+
+        let id = layout.makeFolder(of: [a, d], named: { _ in "New" }, pageCapacity: capacity)
+
+        #expect(id == nil)
+        #expect(layout == original)
+    }
+
+    @Test func namesAFolderOfSeveralAppsAfterTheFirstCategory() {
+        let plain = InstalledApp(id: appID("Plain"), displayName: "Plain")
+        let game = InstalledApp(id: appID("Game"), displayName: "Game", categoryIdentifier: "public.app-category.games")
+        let utility = InstalledApp(
+            id: appID("Utility"),
+            displayName: "Utility",
+            categoryIdentifier: "public.app-category.utilities"
+        )
+
+        #expect(Folder.defaultName(for: [plain, game, utility]) == "Games")
+        #expect(Folder.defaultName(for: [plain, plain]) == "Folder")
+    }
+}

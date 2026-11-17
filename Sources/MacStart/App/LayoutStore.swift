@@ -98,6 +98,35 @@ final class LayoutStore {
         edit { $0.hide(id) }
     }
 
+    /// Hides several apps at once.
+    func hide(_ ids: Set<AppID>) {
+        edit { layout in
+            for id in ids {
+                layout.hide(id)
+            }
+        }
+    }
+
+    /// Moves items to the end of `page`, in reading order. See `Layout.moveItems(_:toPage:pageCapacity:)`.
+    func moveItems(_ ids: Set<Item.ID>, toPage page: Int) {
+        edit { $0.moveItems(ids, toPage: page, pageCapacity: preferences.pageCapacity) }
+    }
+
+    /// Makes a folder of the apps where the first of them is, named after the first App Store category among
+    /// them. Returns the folder's identifier.
+    @discardableResult
+    func makeFolder(of apps: Set<AppID>) -> UUID? {
+        var folderID: UUID?
+        edit { layout in
+            folderID = layout.makeFolder(
+                of: apps,
+                named: { ids in Folder.defaultName(for: ids.compactMap { self.catalog[$0] }) },
+                pageCapacity: preferences.pageCapacity
+            )
+        }
+        return folderID
+    }
+
     /// Shows a hidden app again, at the end of the last page.
     func unhide(_ id: AppID) {
         edit { $0.unhide(id) }

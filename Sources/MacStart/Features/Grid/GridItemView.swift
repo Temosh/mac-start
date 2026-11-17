@@ -1,14 +1,16 @@
 import MacStartCore
 import SwiftUI
 
-/// One tile: an app that launches on click, or a folder that opens on click. Tiles carry no drag gesture: the
-/// overlay has one for all of them.
+/// One tile: an app that launches on click, or a folder that opens on click. In edit mode a click selects the
+/// tile instead. Tiles carry no drag gesture: the overlay has one for all of them.
 struct GridItemView: View {
     let item: Item
     /// True when the keyboard selection is on this tile.
     let isSelected: Bool
     /// True while a dragged app rests on this tile, so a drop here makes or fills a folder.
     let isFolderTarget: Bool
+    /// The tile's mark in edit mode, or nil outside it.
+    let editMark: EditMark?
     let style: TileStyle
     /// Where the tile sits, for the context menu. Nil for search results.
     let location: LayoutLocation?
@@ -38,13 +40,14 @@ struct GridItemView: View {
         // Apps that share a name show their version, so they can be told apart.
         let subtitle = store.sharedDisplayNames.contains(app.displayName) ? app.version : nil
         return Button {
-            actions.launch(app)
+            actions.click(item)
         } label: {
             TileLabel(
                 title: app.displayName,
                 subtitle: subtitle,
                 isSelected: isSelected,
                 isHighlighted: isFolderTarget,
+                editMark: editMark,
                 style: style
             ) {
                 Image(nsImage: icons.icon(for: app, side: style.iconSize))
@@ -68,18 +71,24 @@ struct GridItemView: View {
             }
         }
         .accessibilityLabel(subtitle.map { "\(app.displayName), version \($0)" } ?? app.displayName)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(isMarkedSelected ? .isSelected : [])
+    }
+
+    /// In edit mode, the edit selection is what VoiceOver reports as selected; otherwise, the keyboard selection.
+    private var isMarkedSelected: Bool {
+        editMark.map { $0 == .selected } ?? isSelected
     }
 
     private func folderTile(_ folder: Folder) -> some View {
         Button {
-            actions.openFolder(folder.id)
+            actions.click(item)
         } label: {
             TileLabel(
                 title: folder.name,
                 subtitle: nil,
                 isSelected: isSelected,
                 isHighlighted: isFolderTarget,
+                editMark: editMark,
                 style: style
             ) {
                 FolderIcon(apps: folder.apps.compactMap { store.app(for: $0) }, icons: icons)
@@ -88,7 +97,7 @@ struct GridItemView: View {
         .buttonStyle(TileButtonStyle())
         .focusEffectDisabled()
         .accessibilityLabel("\(folder.name) folder")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(isMarkedSelected ? .isSelected : [])
     }
 }
 
@@ -99,6 +108,8 @@ struct TileLabel<Icon: View>: View {
     let isSelected: Bool
     /// True for a folder drop target.
     let isHighlighted: Bool
+    /// The tile's mark in edit mode, or nil outside it.
+    let editMark: EditMark?
     let style: TileStyle
     let icon: Icon
 
@@ -109,6 +120,7 @@ struct TileLabel<Icon: View>: View {
         subtitle: String?,
         isSelected: Bool,
         isHighlighted: Bool = false,
+        editMark: EditMark? = nil,
         style: TileStyle,
         @ViewBuilder icon: () -> Icon
     ) {
@@ -116,6 +128,7 @@ struct TileLabel<Icon: View>: View {
         self.subtitle = subtitle
         self.isSelected = isSelected
         self.isHighlighted = isHighlighted
+        self.editMark = editMark
         self.style = style
         self.icon = icon()
     }
@@ -125,6 +138,11 @@ struct TileLabel<Icon: View>: View {
         VStack(spacing: style.labelSpacing) {
             icon
                 .frame(width: style.iconSize, height: style.iconSize)
+                .overlay(alignment: .topLeading) {
+                    if let editMark {
+                        EditBadge(mark: editMark, iconSize: style.iconSize)
+                    }
+                }
             // The shadow is on the text only: a shadow of every icon is the costliest part of a moving grid.
             VStack(spacing: 0) {
                 Text(title)
@@ -142,12 +160,13 @@ struct TileLabel<Icon: View>: View {
             }
             .shadow(color: .black.opacity(isHighContrast ? 0.9 : 0.45), radius: isHighContrast ? 3 : 2, y: 1)
         }
-        .frame(maxWidth: style.maxLabelWidth)
-        .padding(style.padding)
+        .padding(.horizontal, style.labelInset)
+        .padding(.vertical, style.padding)
+        .frame(width: style.width)
         .background {
-            if isSelected || isHighlighted {
+            if let fill = highlight(isHighContrast: isHighContrast) {
                 RoundedRectangle(cornerRadius: style.iconSize * 0.2, style: .continuous)
-                    .fill(.white.opacity(isHighContrast ? 0.3 : 0.2))
+                    .fill(fill)
                     .overlay {
                         if isHighContrast {
                             RoundedRectangle(cornerRadius: style.iconSize * 0.2, style: .continuous)
@@ -158,7 +177,20 @@ struct TileLabel<Icon: View>: View {
         }
         // The selection shows at once, also when it moves along with an animated page turn.
         .animation(nil, value: isSelected)
+        .animation(nil, value: editMark)
         .contentShape(Rectangle())
+    }
+
+    /// The tile's background: the accent color for an item selected in edit mode, white for the keyboard
+    /// selection and a folder drop target, none otherwise.
+    private func highlight(isHighContrast: Bool) -> Color? {
+        if editMark == .selected {
+            return Color.accentColor.opacity(isHighContrast ? 0.55 : 0.35)
+        }
+        if isSelected || isHighlighted {
+            return .white.opacity(isHighContrast ? 0.3 : 0.2)
+        }
+        return nil
     }
 }
 

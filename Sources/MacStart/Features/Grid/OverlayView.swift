@@ -3,16 +3,19 @@ import SwiftUI
 
 /// What the overlay's views can ask the controller to do.
 struct OverlayActions {
-    let launch: @MainActor (InstalledApp) -> Void
+    /// A click on a tile: launches the app or opens the folder, or selects the tile in edit mode.
+    let click: @MainActor (Item) -> Void
     let dismiss: @MainActor () -> Void
     let showPage: @MainActor (Int) -> Void
-    let openFolder: @MainActor (UUID) -> Void
     let closeFolder: @MainActor () -> Void
     let renameFolder: @MainActor (UUID, String) -> Void
     let removeFromFolder: @MainActor (UUID, Int) -> Void
     let showInFinder: @MainActor (InstalledApp) -> Void
     let hide: @MainActor (InstalledApp) -> Void
     let openSettings: @MainActor () -> Void
+    /// Enters or leaves edit mode.
+    let toggleEditing: @MainActor () -> Void
+    let performEdit: @MainActor (EditAction) -> Void
     let dragChanged: @MainActor (DragUpdate) -> Void
     let dragEnded: @MainActor () -> Void
 }
@@ -45,6 +48,8 @@ struct OverlayView: View {
                     .onTapGesture { actions.dismiss() }
                     .emptySpaceMenu(actions)
                 content(metrics: metrics)
+                // Under the folder panel, so an open folder dims and covers the page dots as it does the grid.
+                bottomBar(metrics: metrics)
                 folderPanel(metrics: metrics)
                 SearchField(
                     query: $state.query,
@@ -53,14 +58,10 @@ struct OverlayView: View {
                     isHighContrast: contrast == .increased
                 )
                 .position(x: geometry.size.width / 2, y: metrics.toolbarCenterY)
-                ToolbarButton(
-                    systemImage: "gearshape",
-                    label: "Settings",
-                    help: "Settings (⌘,)",
-                    isHighContrast: contrast == .increased,
-                    action: actions.openSettings
-                )
-                .position(x: metrics.toolbarTrailingX - GridMetrics.toolbarHeight / 2, y: metrics.toolbarCenterY)
+                toolbarButtons
+                    .padding(.trailing, geometry.size.width - metrics.toolbarTrailingX)
+                    .frame(width: geometry.size.width, alignment: .trailing)
+                    .position(x: geometry.size.width / 2, y: metrics.toolbarCenterY)
                 DragLayer(state: state, style: metrics.tileStyle, store: store, icons: icons)
             }
             // One drag gesture for the whole overlay. The drag coordinator finds the tile under the press, so the
@@ -113,19 +114,58 @@ struct OverlayView: View {
                 default: break
                 }
             }
-            if store.layout.pages.count > 1 {
-                VStack {
-                    Spacer()
-                    PageIndicator(
-                        pageCount: store.layout.pages.count,
-                        currentPage: state.currentPage,
-                        isHighContrast: contrast == .increased,
-                        select: { actions.showPage($0) }
-                    )
-                    .padding(.bottom, metrics.bottomInset * 0.35)
-                }
+        }
+    }
+
+    /// Edit, or Done in edit mode, then Settings, at the right end of the search field's line.
+    private var toolbarButtons: some View {
+        HStack(spacing: 8) {
+            if state.isEditing {
+                DoneButton(action: actions.toggleEditing)
+            } else {
+                ToolbarButton(
+                    systemImage: "checkmark.circle",
+                    label: "Edit",
+                    help: "Select apps and folders to move, group, or hide",
+                    isHighContrast: contrast == .increased,
+                    action: actions.toggleEditing
+                )
+            }
+            ToolbarButton(
+                systemImage: "gearshape",
+                label: "Settings",
+                help: "Settings (⌘,)",
+                isHighContrast: contrast == .increased,
+                action: actions.openSettings
+            )
+        }
+    }
+
+    /// The bottom of the overlay: the edit actions in edit mode, above the page dots of the grid.
+    private func bottomBar(metrics: GridMetrics) -> some View {
+        let showsPageDots =
+            store.hasLoaded && !state.isSearching && !store.layout.placedAppIDs.isEmpty
+            && store.layout.pages.count > 1
+        return VStack(spacing: 10) {
+            Spacer()
+            if state.isEditing {
+                EditActionBar(
+                    selection: state.editSelection,
+                    pageCount: store.layout.pages.count,
+                    isHighContrast: contrast == .increased,
+                    perform: actions.performEdit
+                )
+            }
+            if showsPageDots {
+                PageIndicator(
+                    pageCount: store.layout.pages.count,
+                    currentPage: state.currentPage,
+                    isHighContrast: contrast == .increased,
+                    select: { actions.showPage($0) }
+                )
             }
         }
+        .padding(.bottom, metrics.bottomInset * 0.35)
     }
 
     @ViewBuilder
@@ -238,6 +278,26 @@ struct SearchField: View {
         .frame(width: width, height: GridMetrics.toolbarHeight)
         .background(Capsule().fill(.white.opacity(isHighContrast ? 0.25 : 0.14)))
         .overlay(Capsule().strokeBorder(.white.opacity(isHighContrast ? 0.85 : 0.25), lineWidth: 1))
+    }
+}
+
+/// The button that leaves edit mode, in the accent color so edit mode is easy to spot.
+struct DoneButton: View {
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("Done")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .frame(height: GridMetrics.toolbarHeight)
+                .background(Capsule().fill(Color.accentColor))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .help("Leave edit mode (Escape)")
     }
 }
 

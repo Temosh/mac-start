@@ -84,6 +84,7 @@ struct PageView: View {
                     item: entry.item,
                     isSelected: entry.slot == selectedSlot,
                     isFolderTarget: entry.isFolderTarget,
+                    editMark: editMark(for: entry.item),
                     style: metrics.tileStyle,
                     location: pageIndex.map { .slot(GridPosition(page: $0, slot: entry.slot)) },
                     store: store,
@@ -107,6 +108,14 @@ struct PageView: View {
                 .animation(.easeOut(duration: 0.2), value: entry.isDragged)
             }
         }
+    }
+
+    /// The tile's mark in edit mode, or nil outside it.
+    private func editMark(for item: Item) -> EditMark? {
+        guard state.isEditing else {
+            return nil
+        }
+        return state.editSelection.contains(item.id) ? .selected : .unselected
     }
 
     private struct Entry {

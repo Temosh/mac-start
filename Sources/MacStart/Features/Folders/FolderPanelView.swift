@@ -66,6 +66,7 @@ struct FolderPanelView: View {
                     item: .app(entry.app.id),
                     isSelected: entry.index == state.folderSelection,
                     isFolderTarget: false,
+                    editMark: nil,
                     style: metrics.tileStyle,
                     location: .inFolder(folder.id, index: entry.index),
                     store: store,

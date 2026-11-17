@@ -27,7 +27,9 @@ The developer agreed to this design after an investigation. Each phase, and each
 - In edit mode, a click selects or deselects a tile instead of launching it. `⇧`-click selects a range in reading order. `⌘A` selects every item on the page, or every search result. The selection persists across pages, and the count covers all pages.
 - Search keeps working in edit mode, so "type a name, `⌘A`, New folder" works.
 - Every tile shows a selection badge. A selected tile shows a checkmark and a highlight, so selection is never shown by color alone. No wiggle animation, and no tint over the whole overlay.
-- An action bar floats above the page dots: the selection count, New folder, Move to page, Hide (`⌘⌫`), and Show in Finder. Inside an open folder it also offers Remove from folder.
+- An action bar floats above the page dots: the selection count, New folder, Move to page, Hide, and Deselect All. Inside an open folder it also offers Remove from folder.
+- No Show in Finder in the bar: for many apps it opens a Finder window per folder. The single-app context menu keeps it.
+- No `⌘⌫` shortcut for Hide: the search field has the focus, where `⌘⌫` deletes text, and a slip would hide many apps with no undo.
   - New folder takes apps only, because folders do not nest.
   - Move to page lists the pages plus New page.
   - Hide can be undone in Settings, under Hidden Apps.
@@ -63,5 +65,8 @@ The developer agreed to this design after an investigation. Each phase, and each
 
 ## Notes
 
-- Phase 1 is built and confirmed by hand.
-- Next step: phase 2, starting with the selection model and the batch edits in `MacStartCore`.
+- Phase 1 is committed.
+- Phase 2, build 1 is committed and confirmed by hand: edit mode in the grid and search results, with the Edit and Done buttons, click, `⌘`-click, `⇧`-click, `⌘A`, Return, Escape, badges, and the action bar with New Folder, Move to Page, Hide, and Show in Finder (since replaced by Deselect All). Core: `Item.ID` is a typed enum; `Layout.moveItems(_:toPage:pageCapacity:)` and `Layout.makeFolder(of:named:pageCapacity:)` with tests in `BatchEditingTests`.
+- A click on empty space in edit mode does nothing, so a stray click never loses the selection. Deselect All clears it.
+- The highlight box is 90% of the cell wide (`TileStyle.width`) for the keyboard selection and the edit selection, so neighboring highlights never touch. Selected items get the accent tint plus the checkmark badge.
+- Phase 2, build 2: right-click on a selected tile for the same actions; Move to page in an app's context menu outside edit mode; edit mode inside an open folder with Remove from folder (how to open a folder in edit mode, for example with a double-click, is still open).

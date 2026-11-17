@@ -4,11 +4,18 @@ import CoreGraphics
 struct TileStyle: Equatable {
     let iconSize: CGFloat
     let labelFontSize: CGFloat
-    let maxLabelWidth: CGFloat
+    /// The width of the tile and of its highlight. It leaves part of the cell free, so the highlights of
+    /// neighboring tiles never touch.
+    let width: CGFloat
 
-    /// The space around the icon and the label.
+    /// The space above the icon and below the label.
     var padding: CGFloat {
         iconSize * 0.1
+    }
+
+    /// The space between the label and the sides of the highlight.
+    var labelInset: CGFloat {
+        max(iconSize * 0.05, 4)
     }
 
     /// The space between the icon and the label.
@@ -54,7 +61,7 @@ struct GridMetrics: Equatable {
     }
 
     var tileStyle: TileStyle {
-        TileStyle(iconSize: iconSize, labelFontSize: labelFontSize, maxLabelWidth: cellSize.width * 0.92)
+        TileStyle(iconSize: iconSize, labelFontSize: labelFontSize, width: cellSize.width * 0.9)
     }
 
     /// The height of the search field and of the buttons beside it.

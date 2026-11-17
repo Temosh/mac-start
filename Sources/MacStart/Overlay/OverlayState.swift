@@ -42,6 +42,12 @@ final class OverlayState {
     var isEditingFolderName = false
     /// The drag in progress.
     var drag: DragSession?
+    /// True in edit mode, where a click selects an item instead of opening it.
+    var isEditing = false
+    /// The items selected in edit mode. They stay selected across pages and searches.
+    var editSelection: Set<Item.ID> = []
+    /// The item that a Shift-click selects a range from: the last one clicked in edit mode.
+    var editSelectionAnchor: Item.ID?
 
     /// The center of the dragged tile, which follows the pointer.
     var dragTileCenter: CGPoint? {
@@ -71,12 +77,21 @@ final class OverlayState {
         }
     }
 
-    /// Clears the search, the selection, the open folder, and any drag, for the next time the overlay opens.
+    /// Leaves edit mode and forgets its selection.
+    func endEditing() {
+        isEditing = false
+        editSelection = []
+        editSelectionAnchor = nil
+    }
+
+    /// Clears the search, the selection, the open folder, any drag, and edit mode, for the next time the overlay
+    /// opens.
     func reset() {
         query = ""
         selection = nil
         drag = nil
         pageOffset = 0
         closeFolder()
+        endEditing()
     }
 }

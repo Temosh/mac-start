@@ -1,3 +1,5 @@
+import Foundation
+
 /// One grid slot: an app or a folder.
 public enum Item: Hashable, Sendable {
     case app(AppID)
@@ -13,11 +15,16 @@ public enum Item: Hashable, Sendable {
 }
 
 extension Item: Identifiable {
-    /// Stays the same when the item moves: the app's path, or the folder's identifier.
-    public var id: String {
+    /// An item's identity, which stays the same when the item moves: the app, or the folder's identifier.
+    public enum ID: Hashable, Sendable {
+        case app(AppID)
+        case folder(UUID)
+    }
+
+    public var id: ID {
         switch self {
-        case .app(let appID): "app:\(appID.path)"
-        case .folder(let folder): "folder:\(folder.id.uuidString)"
+        case .app(let appID): .app(appID)
+        case .folder(let folder): .folder(folder.id)
         }
     }
 }
