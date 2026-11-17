@@ -12,6 +12,7 @@ struct OverlayActions {
     let removeFromFolder: @MainActor (UUID, Int) -> Void
     let showInFinder: @MainActor (InstalledApp) -> Void
     let hide: @MainActor (InstalledApp) -> Void
+    let openSettings: @MainActor () -> Void
     let dragChanged: @MainActor (DragUpdate) -> Void
     let dragEnded: @MainActor () -> Void
 }
@@ -42,10 +43,24 @@ struct OverlayView: View {
                 Color.black.opacity(contrast == .increased ? 0.45 : 0.2)
                     .contentShape(Rectangle())
                     .onTapGesture { actions.dismiss() }
+                    .emptySpaceMenu(actions)
                 content(metrics: metrics)
                 folderPanel(metrics: metrics)
-                SearchField(query: $state.query, isFocused: $isSearchFocused, isHighContrast: contrast == .increased)
-                    .position(x: geometry.size.width / 2, y: metrics.topInset / 2)
+                SearchField(
+                    query: $state.query,
+                    isFocused: $isSearchFocused,
+                    width: metrics.searchFieldWidth,
+                    isHighContrast: contrast == .increased
+                )
+                .position(x: geometry.size.width / 2, y: metrics.toolbarCenterY)
+                ToolbarButton(
+                    systemImage: "gearshape",
+                    label: "Settings",
+                    help: "Settings (⌘,)",
+                    isHighContrast: contrast == .increased,
+                    action: actions.openSettings
+                )
+                .position(x: metrics.toolbarTrailingX - GridMetrics.toolbarHeight / 2, y: metrics.toolbarCenterY)
                 DragLayer(state: state, style: metrics.tileStyle, store: store, icons: icons)
             }
             // One drag gesture for the whole overlay. The drag coordinator finds the tile under the press, so the
@@ -204,10 +219,11 @@ struct DragLayer: View {
 struct SearchField: View {
     @Binding var query: String
     var isFocused: FocusState<Bool>.Binding
+    let width: CGFloat
     let isHighContrast: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.white.opacity(0.75))
                 .accessibilityHidden(true)
@@ -217,11 +233,47 @@ struct SearchField: View {
                 .focused(isFocused)
                 .accessibilityLabel("Search apps")
         }
-        .font(.system(size: 14))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(width: 260)
+        .font(.system(size: 15))
+        .padding(.horizontal, 13)
+        .frame(width: width, height: GridMetrics.toolbarHeight)
         .background(Capsule().fill(.white.opacity(isHighContrast ? 0.25 : 0.14)))
         .overlay(Capsule().strokeBorder(.white.opacity(isHighContrast ? 0.85 : 0.25), lineWidth: 1))
+    }
+}
+
+/// A round button beside the search field, styled like it.
+struct ToolbarButton: View {
+    let systemImage: String
+    let label: String
+    /// The tooltip.
+    let help: String
+    let isHighContrast: Bool
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: GridMetrics.toolbarHeight, height: GridMetrics.toolbarHeight)
+                .background(Circle().fill(.white.opacity(isHighContrast ? 0.25 : 0.14)))
+                .overlay(Circle().strokeBorder(.white.opacity(isHighContrast ? 0.85 : 0.25), lineWidth: 1))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .help(help)
+        .accessibilityLabel(label)
+    }
+}
+
+extension View {
+    /// The menu of the overlay's empty space.
+    func emptySpaceMenu(_ actions: OverlayActions) -> some View {
+        contextMenu {
+            Button("Settings…") {
+                actions.openSettings()
+            }
+        }
     }
 }

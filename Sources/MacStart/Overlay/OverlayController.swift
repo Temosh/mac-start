@@ -32,10 +32,19 @@ final class OverlayController: NSObject, NSWindowDelegate {
     private var previousApp: NSRunningApplication?
     private let logger = LogArea.overlay.logger
 
-    init(store: LayoutStore, icons: IconProvider, launcher: AppLauncher) {
+    /// Opens the settings window, which closes the overlay.
+    private let openSettings: @MainActor () -> Void
+
+    init(
+        store: LayoutStore,
+        icons: IconProvider,
+        launcher: AppLauncher,
+        openSettings: @escaping @MainActor () -> Void
+    ) {
         self.store = store
         self.icons = icons
         self.launcher = launcher
+        self.openSettings = openSettings
         super.init()
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         workspaceCenter.addObserver(
@@ -240,9 +249,18 @@ final class OverlayController: NSObject, NSWindowDelegate {
                 let keyCode = Int(event.keyCode)
                 let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                     .subtracting([.function, .numericPad, .capsLock])
+                // The overlay does not make MacStart the active app, so the menu bar never sees Command-Comma.
+                let isSettingsShortcut = modifiers == .command && event.charactersIgnoringModifiers == ","
                 // Local monitors run on the main thread.
                 let isHandled = MainActor.assumeIsolated {
-                    self?.handleKey(keyCode: keyCode, hasModifiers: !modifiers.isEmpty) ?? false
+                    guard let self else {
+                        return false
+                    }
+                    if isSettingsShortcut, self.panel.isKeyWindow {
+                        self.openSettings()
+                        return true
+                    }
+                    return self.handleKey(keyCode: keyCode, hasModifiers: !modifiers.isEmpty)
                 }
                 return isHandled ? nil : event
             }
@@ -584,6 +602,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             removeFromFolder: { [weak self] id, index in self?.store.removeApp(fromFolder: id, at: index) },
             showInFinder: { [weak self] app in self?.showInFinder(app) },
             hide: { [weak self] app in self?.store.hide(app.id) },
+            openSettings: openSettings,
             dragChanged: { [weak self] update in self?.drags.update(update) },
             dragEnded: { [weak self] in self?.drags.end() }
         )

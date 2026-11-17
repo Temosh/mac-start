@@ -10,7 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let isFirstLaunch: Bool
     private let store: LayoutStore
     private let icons = IconProvider()
-    private lazy var overlay = OverlayController(store: store, icons: icons, launcher: AppLauncher())
+    private lazy var overlay = OverlayController(store: store, icons: icons, launcher: AppLauncher()) {
+        [weak self] in
+        self?.openSettings(nil)
+    }
     private lazy var hotKey = GlobalHotKey { [weak self] in
         self?.overlay.toggle()
     }

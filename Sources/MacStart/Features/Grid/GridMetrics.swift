@@ -5,6 +5,16 @@ struct TileStyle: Equatable {
     let iconSize: CGFloat
     let labelFontSize: CGFloat
     let maxLabelWidth: CGFloat
+
+    /// The space around the icon and the label.
+    var padding: CGFloat {
+        iconSize * 0.1
+    }
+
+    /// The space between the icon and the label.
+    var labelSpacing: CGFloat {
+        iconSize * 0.06
+    }
 }
 
 /// The geometry of the grid for one overlay size and grid size.
@@ -45,6 +55,30 @@ struct GridMetrics: Equatable {
 
     var tileStyle: TileStyle {
         TileStyle(iconSize: iconSize, labelFontSize: labelFontSize, maxLabelWidth: cellSize.width * 0.92)
+    }
+
+    /// The height of the search field and of the buttons beside it.
+    static let toolbarHeight: CGFloat = 38
+
+    /// The vertical center of the search field and the buttons beside it: halfway between the top of the screen
+    /// and the top of the first row's icons, so the space above them matches the space below.
+    var toolbarCenterY: CGFloat {
+        let style = tileStyle
+        // A tile is centered in its cell: padding, icon, spacing, one line of label, padding.
+        let tileHeight = 2 * style.padding + iconSize + style.labelSpacing + labelFontSize * 1.2
+        let iconTop = gridFrame.minY + (cellSize.height - tileHeight) / 2 + style.padding
+        // App icons leave about a tenth of their size clear around the artwork.
+        return (iconTop + iconSize * 0.1) / 2
+    }
+
+    /// Where the buttons beside the search field end: at the right edge of the last column's icons.
+    var toolbarTrailingX: CGFloat {
+        gridFrame.maxX - (cellSize.width - iconSize) / 2
+    }
+
+    /// The search field's width: wider on wider screens, within limits.
+    var searchFieldWidth: CGFloat {
+        min(max(overlaySize.width * 0.18, 280), 360)
     }
 
     /// How many items fit on one page.

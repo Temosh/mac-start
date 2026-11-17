@@ -12,7 +12,7 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 
 ## Layout
 
-- A search field is centered at the top.
+- A search field is centered at the top, halfway between the top of the screen and the first row of icons. A round Settings button sits on the same line, ending at the right edge of the last column's icons.
 - The paged grid fills the middle. Each item shows the app icon with its name below, truncated with an ellipsis. Apps that share a name also show their version below it.
 - Page indicator dots sit at the bottom. Clicking a dot jumps to that page.
 - The default grid is 7 columns by 5 rows. Both are configurable in Settings.
@@ -37,11 +37,13 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 | Drag app inside folder panel | Reorders the folder's apps |
 | Drag app out of folder panel | Closes the folder; the drop removes the app from the folder and places it in the grid, or in another folder |
 | Right-click app | Context menu: Hide, Show in Finder, Remove from Folder (in folders) |
+| Right-click empty area | Context menu: Settings… |
+| `⌘,` | Opens Settings, also while the overlay is open |
 | Losing focus (app switch, Space change) | Closes the overlay |
 
 ## Settings Window
 
-Opened with `⌘,` while MacStart is active, or with Settings in the Dock icon menu. Opening it closes the overlay. `⌘W` closes it.
+Opened with the Settings button at the top of the overlay, Settings… in the menu of the overlay's empty area, `⌘,`, or Settings in the Dock icon menu. Opening it closes the overlay. `⌘W` closes it.
 
 - **Shortcut** (default `⌥S`): click the recorder, then press the new shortcut; Escape cancels. A shortcut needs Command, Option, or Control, unless it is a function key. When another app already owns it, a message says so and the old shortcut stays.
 - **Open at login** (on by default). When macOS needs the user to allow it, a message and an Open Login Items button appear.

@@ -78,6 +78,7 @@ struct PageView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture { actions.dismiss() }
+                .emptySpaceMenu(actions)
             ForEach(entries, id: \.item.id) { entry in
                 GridItemView(
                     item: entry.item,

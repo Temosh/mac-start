@@ -122,7 +122,7 @@ struct TileLabel<Icon: View>: View {
 
     var body: some View {
         let isHighContrast = contrast == .increased
-        VStack(spacing: style.iconSize * 0.06) {
+        VStack(spacing: style.labelSpacing) {
             icon
                 .frame(width: style.iconSize, height: style.iconSize)
             // The shadow is on the text only: a shadow of every icon is the costliest part of a moving grid.
@@ -143,7 +143,7 @@ struct TileLabel<Icon: View>: View {
             .shadow(color: .black.opacity(isHighContrast ? 0.9 : 0.45), radius: isHighContrast ? 3 : 2, y: 1)
         }
         .frame(maxWidth: style.maxLabelWidth)
-        .padding(style.iconSize * 0.1)
+        .padding(style.padding)
         .background {
             if isSelected || isHighlighted {
                 RoundedRectangle(cornerRadius: style.iconSize * 0.2, style: .continuous)
