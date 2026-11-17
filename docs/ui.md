@@ -59,5 +59,6 @@ Opened with `⌘,` while MacStart is active, or with Settings in the Dock icon m
 
 - Every grid item exposes its app name as the accessibility label and has the button role.
 - The grid, search, and folder panel are fully usable from the keyboard.
+- VoiceOver reads the grid as "Apps" with its page, and its scroll commands turn pages.
 - The UI respects Reduce Motion and Increase Contrast. With Increase Contrast, the background is dimmed more, the selection and the search field get a white outline, page dots are brighter, and labels get a stronger shadow.
 - While an input method composes text in the search field, the arrow keys, Return, and Escape go to the input method.

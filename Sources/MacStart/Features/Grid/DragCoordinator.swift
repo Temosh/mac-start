@@ -19,7 +19,8 @@ final class DragCoordinator {
 
     private let store: LayoutStore
     private let state: OverlayState
-    private let showPage: (Int) -> Void
+    /// Turns to a page, with the given changes in the same transaction as the turn.
+    private let showPage: (Int, () -> Void) -> Void
     private var folderCandidateSlot: Int?
     private var folderTimer: Task<Void, Never>?
     /// The slot the gap moves to once the dragged icon rests long enough.
@@ -29,7 +30,7 @@ final class DragCoordinator {
     private var edgeDirection = 0
     private var lastDragEnd = Date.distantPast
 
-    init(store: LayoutStore, state: OverlayState, showPage: @escaping (Int) -> Void) {
+    init(store: LayoutStore, state: OverlayState, showPage: @escaping (Int, () -> Void) -> Void) {
         self.store = store
         self.state = state
         self.showPage = showPage
@@ -264,8 +265,7 @@ final class DragCoordinator {
         drag.folderTargetSlot = nil
         let tileCenter = drag.tileCenter(for: state.dragLocation)
         drag.gapSlot = min(metrics.slot(at: tileCenter), itemCountWithoutDraggedItem(onPage: page, drag: drag))
-        state.drag = drag
-        showPage(page)
+        showPage(page) { state.drag = drag }
     }
 
     private func stopTimers() {

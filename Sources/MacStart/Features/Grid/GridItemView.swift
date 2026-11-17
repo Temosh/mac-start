@@ -179,6 +179,8 @@ struct TileLabel<Icon: View>: View {
                     }
             }
         }
+        // The selection shows at once, also when it moves along with an animated page turn.
+        .animation(nil, value: isSelected)
         .contentShape(Rectangle())
     }
 }
@@ -225,11 +227,16 @@ struct FolderIcon: View {
     let apps: [InstalledApp]
     let icons: IconProvider
 
+    /// The size of the small icons inside a folder icon of `side` points.
+    static func miniSide(forSide side: CGFloat) -> CGFloat {
+        (side - side * 0.07 * 4) / 3
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let side = geometry.size.width
             let spacing = side * 0.07
-            let miniSide = (side - spacing * 4) / 3
+            let miniSide = Self.miniSide(forSide: side)
             RoundedRectangle(cornerRadius: side * 0.22, style: .continuous)
                 .fill(.white.opacity(0.22))
                 .overlay(alignment: .topLeading) {

@@ -84,6 +84,17 @@ struct OverlayView: View {
                 icons: icons,
                 actions: actions
             )
+            // The custom pager gives VoiceOver's scroll commands the same page turns a swipe makes.
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Apps")
+            .accessibilityValue("Page \(state.currentPage + 1) of \(store.layout.pages.count)")
+            .accessibilityScrollAction { edge in
+                switch edge {
+                case .leading: actions.showPage(state.currentPage - 1)
+                case .trailing: actions.showPage(state.currentPage + 1)
+                default: break
+                }
+            }
             if store.layout.pages.count > 1 {
                 VStack {
                     Spacer()

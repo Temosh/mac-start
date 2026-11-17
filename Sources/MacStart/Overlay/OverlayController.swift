@@ -17,8 +17,8 @@ final class OverlayController: NSObject, NSWindowDelegate {
     private let icons: IconProvider
     private let launcher: AppLauncher
     private lazy var panel = makePanel()
-    private lazy var drags = DragCoordinator(store: store, state: state) { [weak self] page in
-        self?.showPage(page)
+    private lazy var drags = DragCoordinator(store: store, state: state) { [weak self] page, changes in
+        self?.showPage(page, alongWith: changes)
     }
     /// Bumped on every show and hide, so a hide that finishes late cannot close a panel shown again meanwhile.
     private var visibilityGeneration = 0
@@ -84,6 +84,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         fadeContent(toVisible: true)
         installEventMonitors()
         state.searchFocusRequest += 1
+        prewarmIcons()
         logger.debug(
             "Overlay shown, frame \(NSStringFromRect(self.panel.frame), privacy: .public), screen \(NSStringFromRect(screen.frame), privacy: .public)"
         )
@@ -145,10 +146,56 @@ final class OverlayController: NSObject, NSWindowDelegate {
         layer.add(fade, forKey: "fade")
     }
 
+    /// Draws the grid's icons in the background, so showing the overlay does not draw them: every placed app at
+    /// the grid's icon size, and the first nine apps of each folder at the folder icon's small size.
+    func prewarmIcons() {
+        guard let screen = NSScreen.screens.first else {
+            return
+        }
+        let metrics = GridMetrics(
+            overlaySize: screen.frame.size,
+            columns: store.preferences.gridColumns,
+            rows: store.preferences.gridRows
+        )
+        let miniSide = FolderIcon.miniSide(forSide: metrics.iconSize)
+        var requests: [(app: InstalledApp, side: CGFloat)] = []
+        for item in store.layout.pages.flatMap(\.items) {
+            switch item {
+            case .app(let id):
+                if let app = store.app(for: id) {
+                    requests.append((app, metrics.iconSize))
+                }
+            case .folder(let folder):
+                for id in folder.apps.prefix(9) {
+                    if let app = store.app(for: id) {
+                        requests.append((app, miniSide))
+                    }
+                }
+            }
+        }
+        Task {
+            await icons.prewarm(requests)
+        }
+    }
+
+    /// The spring that settles the pages.
+    private static let pageSpring = Spring(response: 0.32, dampingRatio: 0.88)
+
     /// Moves to a page, clamped to the existing pages, with a spring from wherever a swipe left the pages.
-    func showPage(_ index: Int) {
+    /// `velocity` is how fast the pages were moving, in points per second, so the spring carries a flick on
+    /// instead of starting from rest. `changes` run in the same transaction as the page turn. A change made just
+    /// before it, in a transaction of its own, could make SwiftUI draw the pager with the old page and then miss
+    /// the new one, so the pages stayed put.
+    func showPage(_ index: Int, velocity: CGFloat = 0, alongWith changes: () -> Void = {}) {
         let page = min(max(index, 0), max(store.layout.pages.count - 1, 0))
-        withAnimation(Self.reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.88)) {
+        let start = -CGFloat(state.currentPage) * panel.frame.width + state.pageOffset
+        let distance = -CGFloat(page) * panel.frame.width - start
+        // The spring takes its starting speed relative to the distance it covers.
+        let relativeVelocity = abs(distance) >= 1 ? min(max(velocity / distance, -20), 20) : 0
+        let animation: Animation? =
+            Self.reduceMotion ? nil : .interpolatingSpring(Self.pageSpring, initialVelocity: relativeVelocity)
+        withAnimation(animation) {
+            changes()
             state.currentPage = page
             state.pageOffset = 0
         }
@@ -269,10 +316,11 @@ final class OverlayController: NSObject, NSWindowDelegate {
         guard let next = navigation.position(after: direction, from: state.selection, onPage: page) else {
             return
         }
-        state.selection = next
-        if !state.isSearching, next.page != page {
-            showPage(next.page)
+        guard !state.isSearching, next.page != page else {
+            state.selection = next
+            return
         }
+        showPage(next.page) { state.selection = next }
     }
 
     /// Return launches the selected app. While searching, it launches the best result when nothing is selected.
@@ -455,6 +503,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         guard tracking.isHorizontal == true else {
             return
         }
+        let velocity = tracking.velocity(at: time)
         let page =
             isCancelled
             ? state.currentPage
@@ -462,10 +511,10 @@ final class OverlayController: NSObject, NSWindowDelegate {
                 from: state.currentPage,
                 pageCount: store.layout.pages.count,
                 offset: Double(tracking.offset),
-                velocity: Double(tracking.velocity(at: time)),
+                velocity: Double(velocity),
                 pageWidth: Double(panel.frame.width)
             )
-        showPage(page)
+        showPage(page, velocity: isCancelled ? 0 : velocity)
     }
 
     private func removeScrollMonitor() {

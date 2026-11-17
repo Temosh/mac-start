@@ -50,9 +50,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else {
                 return
             }
-            Task { await self.store.refreshCatalog() }
+            Task {
+                await self.store.refreshCatalog()
+                self.overlay.prewarmIcons()
+            }
         }
-        Task { await store.load() }
+        Task {
+            await store.load()
+            overlay.prewarmIcons()
+        }
         if !isLaunchedAsLoginItem {
             overlay.show()
         }
