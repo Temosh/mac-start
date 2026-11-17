@@ -168,6 +168,24 @@ final class SettingsModel {
         store.unhide(id)
     }
 
+    // MARK: - Reset
+
+    /// Asks to confirm, then starts the layout over from the installed apps.
+    func resetLayout() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Reset the layout?"
+        alert.informativeText =
+            "Every app goes back in name order, folders are removed, and hidden apps show again. Settings stay. "
+            + "This cannot be undone, so export a backup first to keep the current layout."
+        alert.addButton(withTitle: "Reset Layout").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+        store.resetLayout()
+    }
+
     // MARK: - Backup
 
     /// Asks where to save, then writes the layout and every preference to one JSON file.

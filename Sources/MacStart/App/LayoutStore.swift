@@ -103,6 +103,13 @@ final class LayoutStore {
         edit { $0.hide(id) }
     }
 
+    /// Starts the layout over, as on the first launch: every installed app in name order, with no folders and no
+    /// hidden apps. The preferences stay.
+    func resetLayout() {
+        edit { $0 = .empty }
+        logger.info("Reset the layout to \(self.layout.placedAppIDs.count) apps in name order")
+    }
+
     /// Hides several apps at once.
     func hide(_ ids: Set<AppID>) {
         edit { layout in

@@ -84,6 +84,7 @@ Every edit is followed by reconcile, so the invariants always hold. Positions co
 - Removing several apps from a folder puts them into the slots right after it, in the folder's order. Apps elsewhere stay where they are.
 - Renaming trims surrounding whitespace; an empty name keeps the old one.
 - Hiding adds the app to the hidden set, and reconcile takes it out of its slot or folder. Unhiding removes it from the set, and reconcile appends it to the last page like a new app.
+- Resetting the layout starts over from an empty layout, so reconcile places every installed app as on the first launch. The hidden set empties; the preferences stay.
 - A global shortcut needs Command, Option, or Control, unless its key is a function key (F1–F20), so it never takes a key away from typing.
 
 ## Search

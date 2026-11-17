@@ -58,6 +58,7 @@ Opened with the Settings button at the top of the overlay, Settings… in the me
 - **Open at login** (on by default). When macOS needs the user to allow it, a message and an Open Login Items button appear.
 - **Grid**: columns (3–15) and rows (2–10), default 7 × 5. A change reflows the pages at once.
 - **Hidden Apps**: each hidden app with an Unhide button. Unhidden apps go to the end of the last page. Uninstalled hidden apps show "Not installed".
+- **Layout**: Reset Layout… asks to confirm, then puts every installed app back in name order, as on the first launch, with no folders and no hidden apps. Settings stay. It cannot be undone; export a backup first to keep the old layout.
 - **Backup**: Export and Import buttons with the standard save and open panels. An export covers the layout and every preference, named `MacStart Backup YYYY-MM-DD.json`. An import asks to confirm before it replaces anything.
 
 ## States

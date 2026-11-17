@@ -63,6 +63,17 @@ struct SettingsView: View {
                     }
                 }
             }
+            Section("Layout") {
+                // In a settings form the destructive role alone looks like any other button. The red, which also
+                // tints the bezel, sets it apart from the harmless buttons around it, as in the confirmation alert.
+                Button("Reset Layout…", role: .destructive) {
+                    model.resetLayout()
+                }
+                .foregroundStyle(.red)
+                Text("Puts every app back in name order, with no folders and no hidden apps, as on the first launch.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             Section("Backup") {
                 HStack {
                     Button("Export…") {
