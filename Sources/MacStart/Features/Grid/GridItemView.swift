@@ -21,9 +21,30 @@ struct GridItemView: View {
     let store: LayoutStore
     let icons: IconProvider
     let actions: OverlayActions
+    /// False during a drag, so the tiles that the dragged icon passes do not grow.
+    let isHoverable: Bool
+
+    /// True while the pointer is over the tile.
+    @State private var isHovered = false
 
     var body: some View {
         tile
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    // Continuous hover reports every pointer move; only the first one changes the tile.
+                    if !isHovered {
+                        isHovered = true
+                    }
+                case .ended:
+                    isHovered = false
+                }
+            }
+            // No hover reaches the tiles during a drag, so the tile under the press would stay raised after it.
+            // Forgetting it lets the next pointer move raise the tile that is under the pointer then.
+            .onChange(of: isHoverable) {
+                isHovered = false
+            }
             .scaleEffect(isFolderTarget ? 1.15 : 1)
             .animation(.easeOut(duration: 0.15), value: isFolderTarget)
     }
@@ -51,6 +72,7 @@ struct GridItemView: View {
                 subtitle: subtitle,
                 isSelected: isSelected,
                 isHighlighted: isFolderTarget,
+                isRaised: isHovered && isHoverable,
                 editMark: editMark,
                 onBadgeTap: { actions.select(item) },
                 style: style
@@ -124,6 +146,7 @@ struct GridItemView: View {
                 subtitle: nil,
                 isSelected: isSelected,
                 isHighlighted: isFolderTarget,
+                isRaised: isHovered && isHoverable,
                 editMark: editMark,
                 onBadgeTap: { actions.select(item) },
                 style: style
@@ -158,6 +181,8 @@ struct TileLabel<Icon: View>: View {
     let isSelected: Bool
     /// True for a folder drop target.
     let isHighlighted: Bool
+    /// True while the pointer is over the tile, which makes the icon a little larger.
+    let isRaised: Bool
     /// The tile's mark in edit mode, or nil outside it.
     let editMark: EditMark?
     /// Selects the tile from its edit mode badge.
@@ -166,12 +191,17 @@ struct TileLabel<Icon: View>: View {
     let icon: Icon
 
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// How much a raised icon grows: as much as a dragged tile, so picking up a raised icon does not change its size.
+    private static var raisedScale: CGFloat { 1.08 }
 
     init(
         title: String,
         subtitle: String?,
         isSelected: Bool,
         isHighlighted: Bool = false,
+        isRaised: Bool = false,
         editMark: EditMark? = nil,
         onBadgeTap: (@MainActor () -> Void)? = nil,
         style: TileStyle,
@@ -181,6 +211,7 @@ struct TileLabel<Icon: View>: View {
         self.subtitle = subtitle
         self.isSelected = isSelected
         self.isHighlighted = isHighlighted
+        self.isRaised = isRaised
         self.editMark = editMark
         self.onBadgeTap = onBadgeTap
         self.style = style
@@ -197,6 +228,9 @@ struct TileLabel<Icon: View>: View {
                         EditBadge(mark: editMark, iconSize: style.iconSize) { onBadgeTap?() }
                     }
                 }
+                // The badge grows with the icon it sits on. With Reduce Motion, the size changes without motion.
+                .scaleEffect(isRaised ? Self.raisedScale : 1)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isRaised)
             // The shadow is on the text only: a shadow of every icon is the costliest part of a moving grid.
             VStack(spacing: 0) {
                 Text(title)

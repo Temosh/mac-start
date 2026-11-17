@@ -75,8 +75,7 @@ final class DragCoordinator {
                 return
             }
             // Leaving the folder closes it. The drag goes on in the grid, and a drop takes the app out.
-            state.openFolderID = nil
-            state.folderSelection = nil
+            state.closeFolder()
             drag.folderGapIndex = nil
             drag.page = state.currentPage
             drag.gapSlot = nil

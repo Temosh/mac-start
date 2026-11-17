@@ -1,8 +1,8 @@
 import MacStartCore
 import SwiftUI
 
-/// The open folder: a panel over the dimmed grid, with the folder's name, editable in place, above its apps.
-/// A click outside the panel closes it. Apps can be dragged within the panel, or out of it into the grid.
+/// The open folder: a panel with the folder's name, editable in place, above its apps. The overlay dims the grid
+/// behind it, where a click closes the folder. Apps can be dragged within the panel, or out of it into the grid.
 struct FolderPanelView: View {
     let folder: Folder
     let metrics: FolderPanelMetrics
@@ -34,9 +34,6 @@ struct FolderPanelView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            Color.black.opacity(contrast == .increased ? 0.5 : 0.3)
-                .contentShape(Rectangle())
-                .onTapGesture { actions.closeFolder() }
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay {
@@ -74,7 +71,8 @@ struct FolderPanelView: View {
                     pageCount: store.layout.pages.count,
                     store: store,
                     icons: icons,
-                    actions: actions
+                    actions: actions,
+                    isHoverable: state.drag == nil
                 )
                 .frame(width: metrics.cellSize.width, height: metrics.cellSize.height)
                 // As in the grid: the dragged tile hides under the dragged copy and glides into place from there.

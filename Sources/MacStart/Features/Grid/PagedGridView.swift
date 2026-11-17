@@ -94,7 +94,8 @@ struct PageView: View {
                     pageCount: pageCount,
                     store: store,
                     icons: icons,
-                    actions: actions
+                    actions: actions,
+                    isHoverable: drag == nil
                 )
                 .frame(width: metrics.cellSize.width, height: metrics.cellSize.height)
                 // The dragged tile stays invisible under the dragged copy, because its gesture lives on it. When the

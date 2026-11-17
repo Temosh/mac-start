@@ -245,20 +245,55 @@ struct OverlayView: View {
             .map { FolderPanelMetrics(grid: grid, appCount: $0.apps.count) }
     }
 
-    /// The open folder's panel.
-    @ViewBuilder
+    /// The open folder's panel over the dimmed grid, where a click closes the folder. The panel grows out of the
+    /// folder's icon and shrinks back into it, while the dimming fades. It takes clicks only once it has grown, and
+    /// a closed folder's panel shrinks in place and goes away only once it has shrunk: SwiftUI stops handling hover
+    /// and the next click when views go away while they are hovered or animating out.
     private func folderPanel(metrics: GridMetrics) -> some View {
-        if let folderID = state.openFolderID, let folder = store.folder(withID: folderID) {
-            FolderPanelView(
-                folder: folder,
-                metrics: FolderPanelMetrics(grid: metrics, appCount: folder.apps.count),
-                state: state,
-                store: store,
-                icons: icons,
-                actions: actions
-            )
-            .id(folderID)
+        ZStack {
+            if let folderID = state.shownFolderID, let folder = store.folder(withID: folderID) {
+                let panelMetrics = FolderPanelMetrics(grid: metrics, appCount: folder.apps.count)
+                let isClosing = state.openFolderID == nil
+                let zoom = FolderZoom(
+                    iconCenter: folderIconCenter(folderID, metrics: metrics),
+                    iconSize: metrics.iconSize,
+                    panel: panelMetrics.frame,
+                    overlaySize: metrics.overlaySize
+                )
+                Color.black.opacity(contrast == .increased ? 0.5 : 0.3)
+                    .contentShape(Rectangle())
+                    .onTapGesture { actions.closeFolder() }
+                    .opacity(isClosing ? 0 : 1)
+                    .allowsHitTesting(!isClosing)
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
+                FolderPanelView(
+                    folder: folder,
+                    metrics: panelMetrics,
+                    state: state,
+                    store: store,
+                    icons: icons,
+                    actions: actions
+                )
+                .id(folderID)
+                .modifier(zoom.effect(isCollapsed: isClosing))
+                .allowsHitTesting(state.isFolderSettled)
+                .transition(AsymmetricTransition(insertion: zoom, removal: IdentityTransition()))
+            }
         }
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: OverlayState.folderZoomDuration),
+            value: state.openFolderID
+        )
+    }
+
+    /// Where the folder's icon is on the shown page, or nil when it is not there.
+    private func folderIconCenter(_ id: UUID, metrics: GridMetrics) -> CGPoint? {
+        guard !state.isSearching, let position = store.layout.position(ofFolder: id),
+            position.page == state.currentPage
+        else {
+            return nil
+        }
+        return metrics.iconCenter(ofSlot: position.slot)
     }
 
     private func message(_ text: String) -> some View {

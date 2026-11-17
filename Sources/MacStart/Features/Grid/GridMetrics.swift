@@ -70,12 +70,18 @@ struct GridMetrics: Equatable {
     /// The vertical center of the search field and the buttons beside it: halfway between the top of the screen
     /// and the top of the first row's icons, so the space above them matches the space below.
     var toolbarCenterY: CGFloat {
-        let style = tileStyle
-        // A tile is centered in its cell: padding, icon, spacing, one line of label, padding.
-        let tileHeight = 2 * style.padding + iconSize + style.labelSpacing + labelFontSize * 1.2
-        let iconTop = gridFrame.minY + (cellSize.height - tileHeight) / 2 + style.padding
+        let iconTop = iconCenter(ofSlot: 0).y - iconSize / 2
         // App icons leave about a tenth of their size clear around the artwork.
         return (iconTop + iconSize * 0.1) / 2
+    }
+
+    /// The center of the icon in a slot. A tile is centered in its cell: padding, icon, spacing, one line of label,
+    /// padding.
+    func iconCenter(ofSlot slot: Int) -> CGPoint {
+        let style = tileStyle
+        let tileHeight = 2 * style.padding + iconSize + style.labelSpacing + labelFontSize * 1.2
+        let slotCenter = center(ofSlot: slot)
+        return CGPoint(x: slotCenter.x, y: slotCenter.y - tileHeight / 2 + style.padding + iconSize / 2)
     }
 
     /// Where the buttons beside the search field end: at the right edge of the last column's icons.

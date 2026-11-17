@@ -7,6 +7,9 @@ import Observation
 @MainActor
 @Observable
 final class OverlayState {
+    /// How long a folder's panel takes to grow out of its icon or to shrink back into it.
+    static let folderZoomDuration = 0.2
+
     /// Drives the show and hide animation.
     var isPresented = false
     /// The page the grid shows.
@@ -36,6 +39,11 @@ final class OverlayState {
     var searchFocusRequest = 0
     /// The folder whose panel is open.
     var openFolderID: UUID?
+    /// The folder that just closed, whose panel shrinks back into its icon before it goes away.
+    private(set) var closingFolderID: UUID?
+    /// True once the open folder's panel has finished growing. Until then it takes no clicks and no hover, so a
+    /// tile that passes under the pointer while the panel grows is not left hovered.
+    private(set) var isFolderSettled = false
     /// The keyboard selection inside the open folder, as an index into its apps.
     var folderSelection: Int?
     /// True while the open folder's name is being edited, so its field gets the arrow keys and Return.
@@ -58,16 +66,49 @@ final class OverlayState {
         !query.allSatisfy(\.isWhitespace)
     }
 
-    func openFolder(_ id: UUID) {
-        openFolderID = id
-        folderSelection = nil
-        selection = nil
+    /// The folder whose panel is on screen: the open one, or the one that is shrinking after it closed.
+    var shownFolderID: UUID? {
+        openFolderID ?? closingFolderID
     }
 
+    func openFolder(_ id: UUID) {
+        openFolderID = id
+        closingFolderID = nil
+        isFolderSettled = false
+        folderSelection = nil
+        selection = nil
+        afterFolderZoom { state in
+            if state.openFolderID == id {
+                state.isFolderSettled = true
+            }
+        }
+    }
+
+    /// Closes the open folder. Its panel shrinks back into the folder's icon, taking no clicks, and goes away once
+    /// it has shrunk, so SwiftUI never removes views that are in the middle of a click or hovered.
     func closeFolder() {
+        if let closedID = openFolderID {
+            closingFolderID = closedID
+            afterFolderZoom { state in
+                if state.openFolderID == nil, state.closingFolderID == closedID {
+                    state.closingFolderID = nil
+                }
+            }
+        }
         openFolderID = nil
+        isFolderSettled = false
         folderSelection = nil
         isEditingFolderName = false
+    }
+
+    /// Runs `body` once a folder's panel has finished growing or shrinking.
+    private func afterFolderZoom(_ body: @escaping @MainActor (OverlayState) -> Void) {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(Self.folderZoomDuration))
+            if let self {
+                body(self)
+            }
+        }
     }
 
     /// Moves to the last page when the current one no longer exists.
@@ -92,6 +133,7 @@ final class OverlayState {
         drag = nil
         pageOffset = 0
         closeFolder()
+        closingFolderID = nil
         endEditing()
     }
 }
