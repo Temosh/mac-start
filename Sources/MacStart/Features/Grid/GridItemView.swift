@@ -11,9 +11,13 @@ struct GridItemView: View {
     let isFolderTarget: Bool
     /// The tile's mark in edit mode, or nil outside it.
     let editMark: EditMark?
+    /// For a tile selected in edit mode: what the whole selection allows. Its menu then acts on the selection.
+    let selectionSummary: EditSelectionSummary?
     let style: TileStyle
     /// Where the tile sits, for the context menu. Nil for search results.
     let location: LayoutLocation?
+    /// How many pages there are, for the Move to Page menu.
+    let pageCount: Int
     let store: LayoutStore
     let icons: IconProvider
     let actions: OverlayActions
@@ -58,20 +62,32 @@ struct GridItemView: View {
         .buttonStyle(TileButtonStyle())
         .focusEffectDisabled()
         .contextMenu {
-            Button("Hide") {
-                actions.hide(app)
-            }
-            Button("Show in Finder") {
-                actions.showInFinder(app)
-            }
-            if case .inFolder(let folderID, let index)? = location {
-                Button("Remove from Folder") {
-                    actions.removeFromFolder(folderID, index)
+            if let selectionSummary {
+                SelectionMenuItems(summary: selectionSummary, pageCount: pageCount, perform: actions.performEdit)
+            } else {
+                Button("Hide") {
+                    actions.hide(app)
+                }
+                Button("Show in Finder") {
+                    actions.showInFinder(app)
+                }
+                moveToPageMenu
+                if case .inFolder(let folderID, let index)? = location {
+                    Button("Remove from Folder") {
+                        actions.removeFromFolder(folderID, index)
+                    }
                 }
             }
         }
         .accessibilityLabel(subtitle.map { "\(app.displayName), version \($0)" } ?? app.displayName)
         .accessibilityAddTraits(isMarkedSelected ? .isSelected : [])
+    }
+
+    /// Moves just this item to the end of a page.
+    private var moveToPageMenu: some View {
+        Menu("Move to Page") {
+            PageMenuItems(pageCount: pageCount) { actions.moveItems([item.id], $0) }
+        }
     }
 
     /// In edit mode, the edit selection is what VoiceOver reports as selected; otherwise, the keyboard selection.
@@ -96,6 +112,13 @@ struct GridItemView: View {
         }
         .buttonStyle(TileButtonStyle())
         .focusEffectDisabled()
+        .contextMenu {
+            if let selectionSummary {
+                SelectionMenuItems(summary: selectionSummary, pageCount: pageCount, perform: actions.performEdit)
+            } else {
+                moveToPageMenu
+            }
+        }
         .accessibilityLabel("\(folder.name) folder")
         .accessibilityAddTraits(isMarkedSelected ? .isSelected : [])
     }

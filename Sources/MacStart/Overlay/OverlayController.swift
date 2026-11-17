@@ -492,6 +492,22 @@ final class OverlayController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Moves items to the end of a page and turns to where they landed, in one transaction. An open folder closes,
+    /// because the pages behind it are about to move.
+    private func moveItems(_ ids: Set<Item.ID>, toPage page: Int, alongWith changes: () -> Void = {}) {
+        turnPage {
+            if state.openFolderID != nil {
+                closeFolder()
+            }
+            store.moveItems(ids, toPage: page)
+            changes()
+            // Emptied pages are gone now, so the page of the first moved item tells where they went.
+            return store.layout.pages.firstIndex { candidate in
+                candidate.items.contains { ids.contains($0.id) }
+            }
+        }
+    }
+
     /// Applies an edit action to the selected items, then clears the selection and shows where they went.
     private func performEdit(_ action: EditAction) {
         let selection = state.editSelection
@@ -513,14 +529,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
                 return store.layout.position(ofFolder: folderID)?.page
             }
         case .moveToPage(let page):
-            turnPage {
-                store.moveItems(selection, toPage: page)
-                clearEditSelection()
-                // Emptied pages are gone now, so the page of the first moved item tells where they went.
-                return store.layout.pages.firstIndex { candidate in
-                    candidate.items.contains { selection.contains($0.id) }
-                }
-            }
+            moveItems(selection, toPage: page, alongWith: clearEditSelection)
         case .hide:
             store.hide(apps)
             clearEditSelection()
@@ -753,6 +762,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             click: { [weak self] item in self?.click(item) },
             dismiss: { [weak self] in self?.dismiss() },
             showPage: { [weak self] page in self?.showPage(page) },
+            moveItems: { [weak self] ids, page in self?.moveItems(ids, toPage: page) },
             closeFolder: { [weak self] in self?.closeFolder() },
             renameFolder: { [weak self] id, name in self?.store.renameFolder(id, to: name) },
             removeFromFolder: { [weak self] id, index in self?.store.removeApp(fromFolder: id, at: index) },

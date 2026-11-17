@@ -19,6 +19,7 @@ struct PagedGridView: View {
                 PageView(
                     items: pages[index].items,
                     pageIndex: index,
+                    pageCount: pages.count,
                     selectedSlot: selection?.page == index ? selection?.slot : nil,
                     drag: drag,
                     state: state,
@@ -64,6 +65,8 @@ struct PageView: View {
     let items: [Item]
     /// The page's index, or nil for search results, which cannot be dragged.
     let pageIndex: Int?
+    /// How many pages there are, for the Move to Page menus.
+    let pageCount: Int
     /// The keyboard selection on this page.
     let selectedSlot: Int?
     let drag: DragSession?
@@ -85,8 +88,10 @@ struct PageView: View {
                     isSelected: entry.slot == selectedSlot,
                     isFolderTarget: entry.isFolderTarget,
                     editMark: editMark(for: entry.item),
+                    selectionSummary: editMark(for: entry.item) == .selected ? selectionSummary : nil,
                     style: metrics.tileStyle,
                     location: pageIndex.map { .slot(GridPosition(page: $0, slot: entry.slot)) },
+                    pageCount: pageCount,
                     store: store,
                     icons: icons,
                     actions: actions
@@ -108,6 +113,11 @@ struct PageView: View {
                 .animation(.easeOut(duration: 0.2), value: entry.isDragged)
             }
         }
+    }
+
+    /// What the edit selection allows, for the menus of selected tiles.
+    private var selectionSummary: EditSelectionSummary {
+        EditSelectionSummary(state.editSelection)
     }
 
     /// The tile's mark in edit mode, or nil outside it.

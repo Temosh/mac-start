@@ -7,6 +7,8 @@ struct OverlayActions {
     let click: @MainActor (Item) -> Void
     let dismiss: @MainActor () -> Void
     let showPage: @MainActor (Int) -> Void
+    /// Moves items to the end of a page, then shows where they went.
+    let moveItems: @MainActor (Set<Item.ID>, Int) -> Void
     let closeFolder: @MainActor () -> Void
     let renameFolder: @MainActor (UUID, String) -> Void
     let removeFromFolder: @MainActor (UUID, Int) -> Void
@@ -177,6 +179,7 @@ struct OverlayView: View {
             PageView(
                 items: results.map { .app($0.id) },
                 pageIndex: nil,
+                pageCount: store.layout.pages.count,
                 selectedSlot: state.selection?.slot,
                 drag: nil,
                 state: state,

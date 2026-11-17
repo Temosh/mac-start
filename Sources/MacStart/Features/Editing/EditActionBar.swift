@@ -11,6 +11,79 @@ enum EditAction {
     case deselectAll
 }
 
+/// What the selected items allow, for the action bar and for the menu of a selected tile.
+struct EditSelectionSummary: Equatable {
+    let count: Int
+    let hasOnlyApps: Bool
+
+    init(_ selection: Set<Item.ID>) {
+        count = selection.count
+        hasOnlyApps = selection.allSatisfy {
+            if case .app = $0 {
+                return true
+            }
+            return false
+        }
+    }
+
+    /// Why New Folder is unavailable, or nil when it is available.
+    var newFolderHelp: String? {
+        count >= 2 && hasOnlyApps ? nil : "Select two or more apps, and no folders"
+    }
+
+    /// Why Hide is unavailable, or nil when it is available.
+    var hideHelp: String? {
+        if count == 0 {
+            return "Select apps first"
+        }
+        return hasOnlyApps ? nil : "Works on apps only, not folders"
+    }
+}
+
+/// The items of a Move to Page menu: every page, then a new one at the end.
+struct PageMenuItems: View {
+    let pageCount: Int
+    /// Takes the page to move to. One past the last page makes a new page.
+    let move: @MainActor (Int) -> Void
+
+    var body: some View {
+        ForEach(0..<pageCount, id: \.self) { page in
+            Button("Page \(page + 1)") {
+                move(page)
+            }
+        }
+        Divider()
+        Button("New Page") {
+            move(pageCount)
+        }
+    }
+}
+
+/// The menu of a tile selected in edit mode. Its actions apply to the whole selection, as in Finder.
+struct SelectionMenuItems: View {
+    let summary: EditSelectionSummary
+    let pageCount: Int
+    let perform: @MainActor (EditAction) -> Void
+
+    var body: some View {
+        Button("New Folder with Selection") {
+            perform(.newFolder)
+        }
+        .disabled(summary.newFolderHelp != nil)
+        Menu("Move Selection to Page") {
+            PageMenuItems(pageCount: pageCount) { perform(.moveToPage($0)) }
+        }
+        Button("Hide Selection") {
+            perform(.hide)
+        }
+        .disabled(summary.hideHelp != nil)
+        Divider()
+        Button("Deselect All") {
+            perform(.deselectAll)
+        }
+    }
+}
+
 /// The bar above the page dots in edit mode: how many items are selected, and what to do with them.
 struct EditActionBar: View {
     let selection: Set<Item.ID>
@@ -19,6 +92,7 @@ struct EditActionBar: View {
     let perform: @MainActor (EditAction) -> Void
 
     var body: some View {
+        let summary = EditSelectionSummary(selection)
         HStack(spacing: 2) {
             Text(selection.isEmpty ? "Click items to select them" : "\(selection.count) selected")
                 .foregroundStyle(.white.opacity(isHighContrast ? 0.95 : 0.75))
@@ -26,17 +100,19 @@ struct EditActionBar: View {
                 .padding(.horizontal, 12)
             Divider()
                 .frame(height: 18)
-            barButton("New Folder", systemImage: "folder.badge.plus", help: newFolderHelp) {
+            barButton("New Folder", systemImage: "folder.badge.plus", help: summary.newFolderHelp) {
                 perform(.newFolder)
             }
-            .disabled(newFolderHelp != nil)
+            .disabled(summary.newFolderHelp != nil)
             moveMenu
-            barButton("Hide", systemImage: "eye.slash", help: appsOnlyHelp) {
+            barButton("Hide", systemImage: "eye.slash", help: summary.hideHelp) {
                 perform(.hide)
             }
-            .disabled(appsOnlyHelp != nil)
+            .disabled(summary.hideHelp != nil)
             barButton(
-                "Deselect All", systemImage: "xmark.circle", help: selection.isEmpty ? "Nothing is selected" : nil
+                "Deselect All",
+                systemImage: "xmark.circle",
+                help: selection.isEmpty ? "Nothing is selected" : nil
             ) {
                 perform(.deselectAll)
             }
@@ -53,15 +129,7 @@ struct EditActionBar: View {
 
     private var moveMenu: some View {
         Menu {
-            ForEach(0..<pageCount, id: \.self) { page in
-                Button("Page \(page + 1)") {
-                    perform(.moveToPage(page))
-                }
-            }
-            Divider()
-            Button("New Page") {
-                perform(.moveToPage(pageCount))
-            }
+            PageMenuItems(pageCount: pageCount) { perform(.moveToPage($0)) }
         } label: {
             Label("Move to Page", systemImage: "arrow.right.square")
         }
@@ -92,27 +160,5 @@ struct EditActionBar: View {
         .focusEffectDisabled()
         .opacity(help == nil ? 1 : 0.4)
         .help(help ?? title)
-    }
-
-    private var hasOnlyApps: Bool {
-        selection.allSatisfy {
-            if case .app = $0 {
-                return true
-            }
-            return false
-        }
-    }
-
-    /// Why New Folder is unavailable, or nil when it is available.
-    private var newFolderHelp: String? {
-        selection.count >= 2 && hasOnlyApps ? nil : "Select two or more apps, and no folders"
-    }
-
-    /// Why Hide is unavailable, or nil when it is available.
-    private var appsOnlyHelp: String? {
-        if selection.isEmpty {
-            return "Select apps first"
-        }
-        return hasOnlyApps ? nil : "Works on apps only, not folders"
     }
 }

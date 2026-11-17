@@ -45,13 +45,16 @@ final class DragCoordinator {
     }
 
     /// One step of the overlay's drag gesture. The first step finds the tile under the press. A press that hit no
-    /// tile drags nothing.
+    /// tile, or any press in edit mode, drags nothing.
     func update(_ update: DragUpdate) {
         if state.drag == nil {
             guard update.startLocation != ignoredPressLocation else {
                 return
             }
-            guard let tile = grabbedTile(at: update.startLocation, grid: update.grid, folderPanel: update.folderPanel)
+            // Edit mode moves items with its actions, not by dragging.
+            guard
+                !state.isEditing,
+                let tile = grabbedTile(at: update.startLocation, grid: update.grid, folderPanel: update.folderPanel)
             else {
                 ignoredPressLocation = update.startLocation
                 return

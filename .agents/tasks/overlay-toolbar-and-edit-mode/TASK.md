@@ -42,7 +42,7 @@ The developer agreed to this design after an investigation. Each phase, and each
 
 - Dragging past the last page creates a page. The dragged tile rests at the right edge of the last page, and the pager turns to a temporary empty page with a faint extra dot. A drop there makes the page real; leaving it removes the page. `LayoutEditing.moveItem` already adds a page for a destination one page past the last. `DragCoordinator.turnPage` currently stops at the last page.
 - Rectangle selection by dragging on empty space in edit mode. The overlay-wide drag gesture already detects presses that hit no tile.
-- Dragging several selected tiles at once.
+- Dragging several selected tiles at once: not planned for now. The developer chose no dragging in edit mode instead.
 
 ### Out of scope
 
@@ -69,4 +69,6 @@ The developer agreed to this design after an investigation. Each phase, and each
 - Phase 2, build 1 is committed and confirmed by hand: edit mode in the grid and search results, with the Edit and Done buttons, click, `⌘`-click, `⇧`-click, `⌘A`, Return, Escape, badges, and the action bar with New Folder, Move to Page, Hide, and Show in Finder (since replaced by Deselect All). Core: `Item.ID` is a typed enum; `Layout.moveItems(_:toPage:pageCapacity:)` and `Layout.makeFolder(of:named:pageCapacity:)` with tests in `BatchEditingTests`.
 - A click on empty space in edit mode does nothing, so a stray click never loses the selection. Deselect All clears it.
 - The highlight box is 90% of the cell wide (`TileStyle.width`) for the keyboard selection and the edit selection, so neighboring highlights never touch. Selected items get the accent tint plus the checkmark badge.
-- Phase 2, build 2: right-click on a selected tile for the same actions; Move to page in an app's context menu outside edit mode; edit mode inside an open folder with Remove from folder (how to open a folder in edit mode, for example with a double-click, is still open).
+- Edit mode has no dragging, by the developer's choice; its actions move items.
+- Phase 2, build 2 is committed and confirmed by hand: right-click on a selected tile in edit mode gives the selection's actions (`SelectionMenuItems`); every app and folder menu has Move to Page (`PageMenuItems`), which also works from inside a folder and closes it.
+- Phase 2, build 3: edit mode inside an open folder, with Remove from folder. How to open a folder in edit mode, for example with a double-click, is still open.
