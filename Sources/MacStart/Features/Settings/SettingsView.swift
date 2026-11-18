@@ -1,15 +1,17 @@
+import AppKit
 import MacStartCore
 import SwiftUI
 
-/// The settings window's content: the shortcut and launch at login, the grid size, the hidden apps, and backups.
-struct SettingsView: View {
+/// The width every settings pane shares, so switching panes changes only the window's height.
+private let paneWidth: CGFloat = 500
+
+/// The shortcut and launch at login.
+struct GeneralSettingsPane: View {
     let model: SettingsModel
-    let icons: IconProvider
 
     var body: some View {
-        let preferences = model.store.preferences
         Form {
-            Section("General") {
+            Section {
                 LabeledContent("Shortcut") {
                     HotKeyRecorder(model: model)
                 }
@@ -20,7 +22,10 @@ struct SettingsView: View {
                 }
                 Toggle(
                     "Open at login",
-                    isOn: Binding(get: { preferences.launchAtLogin }, set: { model.setLaunchAtLogin($0) })
+                    isOn: Binding(
+                        get: { model.store.preferences.launchAtLogin },
+                        set: { model.setLaunchAtLogin($0) }
+                    )
                 )
                 if let message = model.loginItemMessage {
                     HStack {
@@ -36,45 +41,128 @@ struct SettingsView: View {
                     }
                 }
             }
-            Section("Grid") {
-                Stepper(
-                    value: Binding(get: { preferences.gridColumns }, set: { model.setGridColumns($0) }),
-                    in: Preferences.allowedGridColumns
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .frame(width: paneWidth)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The grid size, which asks to confirm before it moves apps, and Reset Layout.
+struct LayoutSettingsPane: View {
+    let model: SettingsModel
+
+    var body: some View {
+        Form {
+            Section {
+                Picker(
+                    "Grid size",
+                    selection: Binding(get: { model.gridSize }, set: { model.requestGridSize($0) })
                 ) {
-                    LabeledContent("Columns", value: "\(preferences.gridColumns)")
-                }
-                Stepper(
-                    value: Binding(get: { preferences.gridRows }, set: { model.setGridRows($0) }),
-                    in: Preferences.allowedGridRows
-                ) {
-                    LabeledContent("Rows", value: "\(preferences.gridRows)")
-                }
-            }
-            Section("Hidden Apps") {
-                let hiddenApps = model.hiddenApps
-                if hiddenApps.isEmpty {
-                    Text("No hidden apps. To hide one, right-click it in MacStart and choose Hide.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(hiddenApps) { hidden in
-                        HiddenAppRow(hidden: hidden, icons: icons) {
-                            model.unhide(hidden.id)
+                    ForEach(Preferences.allowedGridRows, id: \.self) { rows in
+                        if rows != Preferences.allowedGridRows.lowerBound {
+                            Divider()
+                        }
+                        ForEach(Preferences.allowedGridColumns, id: \.self) { columns in
+                            let size = GridSize(columns: columns, rows: rows)
+                            Text(size.text).tag(size)
                         }
                     }
                 }
-            }
-            Section("Layout") {
-                // In a settings form the destructive role alone looks like any other button. The red, which also
-                // tints the bezel, sets it apart from the harmless buttons around it, as in the confirmation alert.
-                Button("Reset Layout…", role: .destructive) {
-                    model.resetLayout()
-                }
-                .foregroundStyle(.red)
-                Text("Puts every app back in name order, with no folders and no hidden apps, as on the first launch.")
+                Text("Columns × rows. A new size asks to confirm first, because apps move to fill it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            Section("Backup") {
+            Section {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(
+                        "Puts every app back in name order, with no folders and no hidden apps, as on the first launch."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    Spacer()
+                    // In a settings form the destructive role alone looks like any other button. The red, which
+                    // also tints the bezel, sets it apart from the harmless buttons around it, as in the alert.
+                    Button("Reset Layout…", role: .destructive) {
+                        model.resetLayout()
+                    }
+                    .foregroundStyle(.red)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .frame(width: paneWidth)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The hidden apps, which can run to hundreds: a search field, a list where several can be selected, and one
+/// Unhide button for the selection.
+struct HiddenAppsSettingsPane: View {
+    let model: SettingsModel
+    let icons: IconProvider
+
+    @State private var query = ""
+    @State private var selection: Set<AppID> = []
+
+    var body: some View {
+        let hiddenApps = model.hiddenApps
+        let shown = matches(in: hiddenApps)
+        VStack(alignment: .leading, spacing: 10) {
+            if hiddenApps.isEmpty {
+                Text("No hidden apps. To hide one, right-click it in MacStart and choose Hide.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                SystemSearchField(text: $query, placeholder: "Search \(hiddenApps.count) hidden apps")
+                List(shown, selection: $selection) { hidden in
+                    HiddenAppRow(hidden: hidden, icons: icons)
+                }
+                .listStyle(.bordered(alternatesRowBackgrounds: true))
+                HStack {
+                    Text(
+                        selection.isEmpty
+                            ? "Select apps to show them again. ⌘-click or ⇧-click selects several."
+                            : "\(selection.count) of \(hiddenApps.count) selected"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Unhide") {
+                        model.unhide(selection)
+                        selection = []
+                    }
+                    .disabled(selection.isEmpty)
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: paneWidth, height: 440)
+        // Only apps the list shows stay selected, so Unhide never acts on apps the search hides.
+        .onChange(of: query) {
+            selection.formIntersection(matches(in: model.hiddenApps).map(\.id))
+        }
+    }
+
+    private func matches(in hiddenApps: [SettingsModel.HiddenApp]) -> [SettingsModel.HiddenApp] {
+        let words = query.trimmingCharacters(in: .whitespaces)
+        guard !words.isEmpty else {
+            return hiddenApps
+        }
+        return hiddenApps.filter { $0.name.localizedStandardContains(words) }
+    }
+}
+
+/// Export and import of the whole setup.
+struct BackupSettingsPane: View {
+    let model: SettingsModel
+
+    var body: some View {
+        Form {
+            Section {
                 HStack {
                     Button("Export…") {
                         model.exportBackup()
@@ -91,8 +179,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .frame(minHeight: 520)
+        .scrollDisabled(true)
+        .frame(width: paneWidth)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -117,17 +206,16 @@ struct HotKeyRecorder: View {
     }
 }
 
-/// One hidden app with its Unhide button.
+/// One hidden app in the list.
 struct HiddenAppRow: View {
     let hidden: SettingsModel.HiddenApp
     let icons: IconProvider
-    let unhide: () -> Void
 
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
             Group {
                 if let app = hidden.app {
-                    Image(nsImage: icons.icon(for: app, side: 24))
+                    Image(nsImage: icons.icon(for: app, side: 20))
                         .resizable()
                         .interpolation(.high)
                 } else {
@@ -136,19 +224,63 @@ struct HiddenAppRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 20, height: 20)
             .accessibilityHidden(true)
-            VStack(alignment: .leading) {
-                Text(hidden.name)
-                if hidden.app == nil {
-                    Text("Not installed")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text(hidden.name)
             Spacer()
-            Button("Unhide", action: unhide)
-                .accessibilityLabel("Unhide \(hidden.name)")
+            if hidden.app == nil {
+                Text("Not installed")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The system search field, bound to a string. A SwiftUI search field would go into the window's toolbar, which
+/// holds the pane buttons.
+struct SystemSearchField: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = placeholder
+        field.delegate = context.coordinator
+        field.target = context.coordinator
+        field.action = #selector(Coordinator.searchChanged(_:))
+        return field
+    }
+
+    func updateNSView(_ field: NSSearchField, context: Context) {
+        context.coordinator.text = $text
+        if field.stringValue != text {
+            field.stringValue = text
+        }
+        field.placeholderString = placeholder
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            if let field = notification.object as? NSSearchField {
+                text.wrappedValue = field.stringValue
+            }
+        }
+
+        /// The clear button and Return send the action.
+        @objc func searchChanged(_ field: NSSearchField) {
+            text.wrappedValue = field.stringValue
         }
     }
 }

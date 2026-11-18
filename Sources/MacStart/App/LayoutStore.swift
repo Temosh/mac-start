@@ -153,9 +153,13 @@ final class LayoutStore {
         return folderID
     }
 
-    /// Shows a hidden app again, at the end of the last page.
-    func unhide(_ id: AppID) {
-        edit { $0.unhide(id) }
+    /// Shows hidden apps again, at the end of the last page, in one edit.
+    func unhide(_ ids: some Collection<AppID>) {
+        edit { layout in
+            for id in ids {
+                layout.unhide(id)
+            }
+        }
     }
 
     // MARK: - Preferences, export, and import

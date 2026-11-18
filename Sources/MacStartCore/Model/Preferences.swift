@@ -1,9 +1,9 @@
 /// The user's settings. Stored in `UserDefaults` and included in every export.
 public struct Preferences: Hashable, Sendable {
-    /// The column counts Settings offers and files may contain.
-    public static let allowedGridColumns = 3...15
-    /// The row counts Settings offers and files may contain.
-    public static let allowedGridRows = 2...10
+    /// The column counts Settings offers. Grids outside these ranges look wrong on the screen sizes MacStart runs on.
+    public static let allowedGridColumns = 5...9
+    /// The row counts Settings offers.
+    public static let allowedGridRows = 4...6
 
     /// The global shortcut that toggles the overlay.
     public var hotKey: HotKey
@@ -42,29 +42,14 @@ extension Preferences: Codable {
         case launchAtLogin
     }
 
-    /// Rejects grid sizes outside the allowed ranges instead of clamping them, so a bad file is reported.
+    /// A grid size outside the allowed ranges, as in a backup from a version that allowed more, is clamped to the
+    /// nearest allowed size instead of failing the whole file.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let columns = try container.decode(Int.self, forKey: .gridColumns)
-        guard Self.allowedGridColumns.contains(columns) else {
-            throw DecodingError.dataCorruptedError(
-                forKey: .gridColumns,
-                in: container,
-                debugDescription: "Grid columns must be in \(Self.allowedGridColumns), got \(columns)."
-            )
-        }
-        let rows = try container.decode(Int.self, forKey: .gridRows)
-        guard Self.allowedGridRows.contains(rows) else {
-            throw DecodingError.dataCorruptedError(
-                forKey: .gridRows,
-                in: container,
-                debugDescription: "Grid rows must be in \(Self.allowedGridRows), got \(rows)."
-            )
-        }
         self.init(
             hotKey: try container.decode(HotKey.self, forKey: .hotKey),
-            gridColumns: columns,
-            gridRows: rows,
+            gridColumns: try container.decode(Int.self, forKey: .gridColumns),
+            gridRows: try container.decode(Int.self, forKey: .gridRows),
             launchAtLogin: try container.decode(Bool.self, forKey: .launchAtLogin)
         )
     }

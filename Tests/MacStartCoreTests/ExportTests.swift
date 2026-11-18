@@ -79,8 +79,6 @@ struct ExportTests {
 
     @Test(arguments: [
         (#""path" : "/Applications/Safari.app""#, #""path" : "Applications/Safari.app""#),
-        (#""gridColumns" : 8"#, #""gridColumns" : 99"#),
-        (#""gridRows" : 6"#, #""gridRows" : 0"#),
         (#"[ "control", "option" ]"#, #"[ "control", "hyper" ]"#),
         (#"{ "app" : { "bundleIdentifier" : "com.apple.Safari", "path" : "/Applications/Safari.app" } }"#, "{ }"),
     ])
@@ -94,6 +92,18 @@ struct ExportTests {
             Issue.record("Expected malformedData, got \(String(describing: error))")
             return
         }
+    }
+
+    @Test func importClampsAGridSizeOutsideTheAllowedRanges() throws {
+        #expect(Fixtures.exportV1.contains(#""gridColumns" : 8"#))
+        let json = Fixtures.exportV1
+            .replacingOccurrences(of: #""gridColumns" : 8"#, with: #""gridColumns" : 15"#)
+            .replacingOccurrences(of: #""gridRows" : 6"#, with: #""gridRows" : 2"#)
+
+        let export = try Export(jsonData: Data(json.utf8))
+
+        #expect(export.preferences.gridColumns == Preferences.allowedGridColumns.upperBound)
+        #expect(export.preferences.gridRows == Preferences.allowedGridRows.lowerBound)
     }
 
     @Test func aSnapshotKeepsWholeSecondsSoItSurvivesTheRoundTrip() throws {

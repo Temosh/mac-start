@@ -65,12 +65,14 @@ Handoff state:
   - A two-finger swipe, a mouse wheel, the left and right arrow keys, and the page dots all change pages.
   - The overlay also opens over a full-screen app.
 - M6: built on 2026-11-16 and waiting for the developer's check by hand. 90 tests pass. The agent did not launch the app, because the developer was at the screen. The first launch of this build saves the default preferences and registers launch at login, which can show a Background Items notification.
+- M6 rework, built on 2026-11-18 after the developer's first check found the one-page form growing with the hidden apps list, too-wide grid ranges, and grid changes that rearranged pages without asking. The window now has toolbar panes (General, Layout, Hidden Apps, Backup) per Apple's settings guidelines; the grid is one Grid size pop-up from 5 × 4 to 9 × 6 that asks to confirm ([ADR 0002](../../../docs/adr/0002-limit-the-grid-and-confirm-size-changes.md)); hidden apps get a search field, multiple selection, and one Unhide button. 119 tests pass. The panes were checked in offscreen renders only, never shown on the developer's screen. Waiting for the developer's check.
 - Developer's checks for M6:
   - Command-Comma and Settings in the Dock icon's menu open the settings window, and the overlay closes.
   - The shortcut recorder takes a new shortcut, which works at once and is still there after a restart. Escape cancels. A plain letter is refused with a message.
   - Open at login registers MacStart in System Settings > General > Login Items, and turning it off removes it.
-  - Changing columns or rows reflows the grid at once.
-  - Right-click > Hide removes an app from the grid and search. Unhide in Settings puts it back at the end.
+  - The window has toolbar buttons for General, Layout, Hidden Apps, and Backup; the title names the pane, and the window reopens on the last pane.
+  - Picking a grid size asks to confirm; Change Grid reflows the pages, Cancel keeps the old size. Only 5 × 4 to 9 × 6 are offered.
+  - Right-click > Hide removes an app from the grid and search. In Settings > Hidden Apps, search finds it, several can be selected, and Unhide puts them back at the end.
   - Export writes a JSON file. Import of that file asks to confirm, then restores the layout and settings. Importing a file that is not a backup shows an alert and changes nothing.
 - When the developer accepts M6, every milestone is done. Then move any remaining facts from these notes into `docs/`, and delete this task folder with the developer's confirmation.
 - M5: built on 2026-11-16; the developer tested it by hand, reported two issues (folders could not be made, dropped icons jumped back), both fixed, and accepted it. 86 tests pass; the layout edits (`Layout.moveItem`, `dropApp`, `removeApp(fromFolder:)`, `moveApp(inFolder:)`, `renameFolder`) are in `MacStartCore` and tested. The agent did not launch the app, because the developer was at the screen.

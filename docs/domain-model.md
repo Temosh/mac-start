@@ -23,7 +23,7 @@ erDiagram
 | `Item` | `.app(AppID)` or `.folder(Folder)` | |
 | `Page` | ordered `[Item]` | Holds at most rows × columns items. |
 | `Layout` | ordered `[Page]`, hidden `Set<AppID>` | Persisted in `layout.json` together with a schema version. |
-| `Preferences` | hotkey (virtual key code + modifiers, default `⌥S`), grid columns × rows (default 7 × 5, columns 3–15, rows 2–10), launch at login (default on) | Persisted in `UserDefaults`. |
+| `Preferences` | hotkey (virtual key code + modifiers, default `⌥S`), grid columns × rows (default 7 × 5, columns 5–9, rows 4–6), launch at login (default on) | Persisted in `UserDefaults`. |
 | `Export` | schema version, exported-at timestamp, `Layout`, `Preferences` | The complete state of the app, written to one file. |
 
 ## Invariants
@@ -147,4 +147,4 @@ An export file in schema version 1:
 - An item is an object with exactly one key, `app` or `folder`. `bundleIdentifier` is left out when the bundle has none.
 - `keyCode` is the virtual key code (`kVK_*`, `0x01` is S). `modifiers` lists `control`, `option`, `shift`, and `command`, in that order.
 - `layout.json` holds `{ "schemaVersion" : 1, "layout" : { ... } }`. The preferences are stored as the JSON string `{ "schemaVersion" : 1, "preferences" : { ... } }` under the `UserDefaults` key `preferences`.
-- Reading rejects invalid JSON, a missing field, a relative app path, a grid size outside the allowed ranges, an unknown modifier, and an item that is neither an app nor a folder. Stored preferences that cannot be read are replaced by the defaults.
+- Reading rejects invalid JSON, a missing field, a relative app path, an unknown modifier, and an item that is neither an app nor a folder. A grid size outside the allowed ranges is clamped to the nearest allowed size, so backups from versions that allowed more still import ([ADR 0002](adr/0002-limit-the-grid-and-confirm-size-changes.md)). Stored preferences that cannot be read are replaced by the defaults.

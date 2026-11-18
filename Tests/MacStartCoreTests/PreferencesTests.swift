@@ -1,3 +1,4 @@
+import Foundation
 import MacStartCore
 import Testing
 
@@ -22,6 +23,21 @@ struct PreferencesTests {
         preferences.gridRows = 50
         #expect(preferences.gridColumns == Preferences.allowedGridColumns.lowerBound)
         #expect(preferences.gridRows == Preferences.allowedGridRows.upperBound)
+    }
+
+    @Test func readingClampsAGridSizeOutsideTheAllowedRanges() throws {
+        let saved = Preferences(hotKey: .default, gridColumns: 7, gridRows: 5, launchAtLogin: true)
+        var json = try #require(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(saved)) as? [String: Any]
+        )
+        json["gridColumns"] = 12
+        json["gridRows"] = 2
+
+        let read = try JSONDecoder().decode(Preferences.self, from: JSONSerialization.data(withJSONObject: json))
+
+        #expect(read.gridColumns == Preferences.allowedGridColumns.upperBound)
+        #expect(read.gridRows == Preferences.allowedGridRows.lowerBound)
+        #expect(read.hotKey == saved.hotKey)
     }
 
     @Test func storeLoadsNilBeforeTheFirstSave() {

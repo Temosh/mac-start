@@ -110,12 +110,41 @@ final class SettingsModel {
 
     // MARK: - Grid
 
-    func setGridColumns(_ columns: Int) {
-        store.updatePreferences { $0.gridColumns = columns }
+    var gridSize: GridSize {
+        GridSize(columns: store.preferences.gridColumns, rows: store.preferences.gridRows)
     }
 
-    func setGridRows(_ rows: Int) {
-        store.updatePreferences { $0.gridRows = rows }
+    /// Asks to confirm, then changes the grid size, because the change moves apps the user arranged. Called from
+    /// the size pop-up, so the alert waits until the pop-up's own event is done.
+    func requestGridSize(_ size: GridSize) {
+        guard size != gridSize else {
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.confirmGridChange(to: size) else {
+                return
+            }
+            self.store.updatePreferences { preferences in
+                preferences.gridColumns = size.columns
+                preferences.gridRows = size.rows
+            }
+        }
+    }
+
+    private func confirmGridChange(to size: GridSize) -> Bool {
+        let current = gridSize
+        let alert = NSAlert()
+        alert.messageText = "Change the grid to \(size.text)?"
+        var details = "Apps keep their order, but they shift into the new rows and columns"
+        if size.capacity < current.capacity {
+            details += ", and apps that no longer fit move onto the next pages"
+        }
+        alert.informativeText =
+            "Pages hold \(size.capacity) apps instead of \(current.capacity). \(details). Folders and hidden apps stay. "
+            + "Changing back does not restore the current arrangement, so export a backup first to keep it."
+        alert.addButton(withTitle: "Change Grid")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     // MARK: - Launch at login
@@ -164,8 +193,8 @@ final class SettingsModel {
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    func unhide(_ id: AppID) {
-        store.unhide(id)
+    func unhide(_ ids: Set<AppID>) {
+        store.unhide(ids)
     }
 
     // MARK: - Reset
@@ -276,5 +305,20 @@ final class SettingsModel {
     @concurrent
     private nonisolated static func read(from url: URL) async throws -> Data {
         try Data(contentsOf: url)
+    }
+}
+
+/// A grid size Settings offers: every allowed column count for every allowed row count.
+struct GridSize: Hashable {
+    let columns: Int
+    let rows: Int
+
+    var capacity: Int {
+        columns * rows
+    }
+
+    /// Columns by rows, as in "7 × 5".
+    var text: String {
+        "\(columns) × \(rows)"
     }
 }
