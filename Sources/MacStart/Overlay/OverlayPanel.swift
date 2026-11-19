@@ -8,6 +8,9 @@ import SwiftUI
 final class OverlayPanel: NSPanel {
     /// Handles a key press. Returns true when the key was used.
     var onKeyDown: ((NSEvent) -> Bool)?
+    /// The SwiftUI content above the blur, which the controller zooms with Core Animation as the overlay shows and
+    /// hides.
+    private(set) weak var hostingView: NSView?
 
     init(contentRect: NSRect) {
         super.init(
@@ -43,9 +46,12 @@ final class OverlayPanel: NSPanel {
         let hostingView = NSHostingView(rootView: rootView)
         // The panel's frame follows the screen; the SwiftUI content must never resize it.
         hostingView.sizingOptions = []
+        // Layer-backed from the start, so the controller can zoom the content before it first draws.
+        hostingView.wantsLayer = true
         hostingView.frame = blur.bounds
         hostingView.autoresizingMask = [.width, .height]
         blur.addSubview(hostingView)
+        self.hostingView = hostingView
     }
 
     override var canBecomeKey: Bool {

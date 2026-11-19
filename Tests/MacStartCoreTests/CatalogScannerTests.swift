@@ -28,6 +28,19 @@ struct CatalogScannerTests {
         }
     }
 
+    @Test func findsAppsUpToFiveLevelsBelowARootButNotDeeper() throws {
+        try withTemporaryDirectory { root in
+            try makeAppBundle(
+                at: root.appending(path: "Unity/Hub/Editor/6000.1/Unity.app"), bundleIdentifier: "test.editor")
+            try makeAppBundle(
+                at: root.appending(path: "Unity/Hub/Editor/6000.1/Engines/Player.app"), bundleIdentifier: "test.player")
+
+            let catalog = CatalogScanner(roots: [root]).scan()
+
+            #expect(Set(catalog.apps.map(\.id.path)) == paths(root, "Unity/Hub/Editor/6000.1/Unity.app"))
+        }
+    }
+
     @Test func includesAnAppWithTheHiddenFileFlagButSkipsDotFolders() throws {
         try withTemporaryDirectory { root in
             var flaggedApp = root.appending(path: "Flagged.app")

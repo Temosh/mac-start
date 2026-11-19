@@ -95,11 +95,6 @@ struct OverlayView: View {
             .coordinateSpace(.named(Self.coordinateSpace))
         }
         .ignoresSafeArea()
-        .scaleEffect(state.isPresented || reduceMotion ? 1 : 1.06)
-        .animation(
-            reduceMotion ? nil : .easeOut(duration: OverlayController.animationDuration),
-            value: state.isPresented
-        )
         .onChange(of: store.layout.pages.count) { _, pageCount in
             state.clampPage(toPageCount: pageCount)
         }

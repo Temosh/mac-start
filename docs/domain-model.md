@@ -64,7 +64,7 @@ When several bundles share a name, the grid shows the bundle version (`CFBundleS
 
 The catalog holds every `.app` bundle with an `Info.plist` under `/Applications`, `/System/Applications`, and `~/Applications`:
 
-- Folders are scanned recursively, but never inside a bundle, so helper apps inside other apps are not listed.
+- Folders are scanned up to five levels below each root, and never inside a bundle, so helper apps inside other apps are not listed. Unity Hub keeps its editors five levels down (`/Applications/Unity/Hub/Editor/<version>/Unity.app`). Deeper folders hold content such as SDKs: tens of thousands of files under one Unity install made every scan cost about 0.4 s.
 - Names starting with a dot are skipped. The hidden file flag is ignored, because `/Applications/Safari.app` is a symbolic link that carries it.
 - A bundle without an `Info.plist` cannot be launched and is skipped. Some developer tools install such template bundles.
 - A symbolic link to an app counts as that app, under the link's path. When a link and its target are both inside the scanned folders, the app is listed once, under the target's path.

@@ -26,7 +26,7 @@ Sources/
   MacStartCore/            Library. Foundation only: no AppKit, no SwiftUI.
     Model/                 AppID, InstalledApp, Catalog, Folder, Item, Page, Layout, Preferences
     Reconcile/             Pure reconcile and invariant checks
-    Catalog/               App bundle scanning (FileManager + Bundle)
+    Catalog/               App bundle scanning (FileManager + Bundle), and which file changes can change it
     Persistence/           JSON format, layout.json store, preferences store, export/import
     Search/                Search matching and ranking
     Navigation/            Keyboard selection across pages, and where a swipe lands
@@ -76,12 +76,12 @@ This is the layout as built.
 | Smooth motion | Swipe offset and drag pointer are separate state, read only in small modifiers. Icons are pre-sized bitmaps, drawn off the main actor after each scan and when the overlay opens. Only label text has a shadow. The settle spring starts at the swipe's speed. Every page is built, not only the pages near the shown one | Swipe and drag frames move views without rebuilding or re-rendering the tiles, opening the overlay draws no icons, and a flick flows into the settle. With a few pages, lazy pages save little, and they would have to keep every page built that a long swipe or an interrupted jump across pages can show |
 | Keyboard | A local key monitor takes the arrow keys, Return, and Escape before the focused search field; every other key goes to the field | Typing searches at once, while the grid stays keyboard driven |
 | Drag and drop | One SwiftUI drag gesture for the whole overlay, with a coordinator that finds the tile whose cell holds the press; not system drag and drop, so icons make room live. Tiles carry no gestures, so a folder panel closes as soon as a drag leaves it. A full page opens no gap, so a drop never pushes icons to the next page (see the editing rules in [domain-model.md](domain-model.md#editing)) | Launchpad-like reflow, folder creation by resting on an icon, and page turns at the screen edges |
-| Show and hide animation | The content view's layer fades with an explicit Core Animation fade, after its final opacity is set; SwiftUI scales the content | `NSWindow.animator()` alpha can stall at its start value, for example while the display sleeps, which would leave an invisible overlay |
+| Show and hide animation | The content view's layer fades, and the SwiftUI content zooms from 1.06 through its layer's `sublayerTransform`, each with an explicit Core Animation animation after its final value is set | `NSWindow.animator()` alpha can stall at its start value, for example while the display sleeps, which would leave an invisible overlay. A SwiftUI scale redrew every label at each frame's size, and CoreGraphics keeps the glyphs of every size it draws: about 0.3 MB and 0.14 s of CPU per show and hide |
 | Target display | `NSScreen.screens.first`, the display that holds the menu bar | `NSScreen.main` follows keyboard focus, which is not the main display |
 | Background | `NSVisualEffectView` blur behind the grid | Native look like Launchpad |
-| App discovery | Scan `/Applications`, `/System/Applications`, `~/Applications` recursively (skipping into `.app` bundles), plus FSEvents watching on those roots, debounced by a 2-second FSEvents latency | One code path handles the full scan and later updates, which keeps the list free of duplicates |
+| App discovery | Scan `/Applications`, `/System/Applications`, `~/Applications` up to five levels deep (never into `.app` bundles), plus FSEvents watching on those roots, debounced by a 2-second FSEvents latency. A change inside a bundle, below its `Contents` folder, or below the scan depth starts no rescan | One code path handles the full scan and later updates, which keeps the list free of duplicates. FSEvents reports every write inside a bundle, such as an install in progress, and a scan of every folder took 0.4 s with one Unity install |
 | Launching | `NSWorkspace.openApplication(at:configuration:)` | |
-| Icons | `NSWorkspace.icon(forFile:)` on the bundle URL, cached in memory by path and version | An updated app gets its new icon |
+| Icons | `NSWorkspace.icon(forFile:)` on the bundle URL, drawn into an IOSurface-backed bitmap and cached in memory by path and version. Icons of apps that left the catalog go when the overlay prewarms, and all of them when the grid's icon size or the display scale changes | An updated app gets its new icon. Core Animation shows an IOSurface without copying it; from ordinary memory, it keeps a second copy of every icon it shows |
 | Layout storage | `~/Library/Application Support/MacStart/layout.json`, written atomically | Human-readable, and uses the same format as export |
 | Preferences | `Preferences` value in `MacStartCore`, stored in `UserDefaults` | Small settings, included in export |
 | Dock icon | `applicationShouldHandleReopen` toggles the overlay; `applicationDockMenu` adds Settings | Same entry point as Launchpad |
@@ -110,7 +110,7 @@ Catalog changes from FSEvents trigger a rescan, then `LayoutStore` reconciles an
 
 ## Testing Strategy
 
-- Unit tests cover `MacStartCore`: reconcile invariants, duplicate collapsing, the export/import round trip, schema version rejection, and catalog scanning against temporary bundle fixtures. A seeded random test reconciles hundreds of random layouts and checks every invariant.
+- Unit tests cover `MacStartCore`: reconcile invariants, duplicate collapsing, the export/import round trip, schema version rejection, catalog scanning against temporary bundle fixtures, and which FSEvents paths start a rescan. A seeded random test reconciles hundreds of random layouts and checks every invariant.
 - The overlay, hotkey, input, and settings are checked by hand by the developer, in the built app with the display awake. UI automation is out of scope for now. How agents take part in these checks: `.agents/rules/workflow.md`.
 - Manual checks, by area:
   - Overlay: Option-S and the Dock icon toggle it over the whole main display, including the menu bar and the Dock, also over a full-screen app. A click on an app launches it. A click between icons, Escape, switching apps, or switching Spaces closes it, and the previous app gets the focus back. A two-finger swipe, a mouse wheel, the arrow keys at the page edge, and the page dots change pages.

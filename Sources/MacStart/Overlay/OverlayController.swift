@@ -8,7 +8,10 @@ import os
 @MainActor
 final class OverlayController: NSObject, NSWindowDelegate {
     /// The length of the show and hide animations, in seconds.
-    static let animationDuration = 0.2
+    private static let animationDuration = 0.2
+    /// How much larger the content is when it starts to zoom in as the overlay shows, and when it has zoomed out as
+    /// the overlay hides.
+    private static let zoomedOutScale: CGFloat = 1.06
     /// The shortest time between two page turns from a mouse wheel, so one flick turns one page.
     private static let wheelPageTurnInterval = 0.3
 
@@ -87,10 +90,11 @@ final class OverlayController: NSObject, NSWindowDelegate {
 
         if !panel.isVisible {
             panel.contentView?.alphaValue = 0
+            setContentZoom(isZoomedOut: true)
         }
         panel.makeKeyAndOrderFront(nil)
         state.isPresented = true
-        fadeContent(toVisible: true)
+        animateContent(toVisible: true)
         installEventMonitors()
         state.searchFocusRequest += 1
         prewarmIcons()
@@ -110,7 +114,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         visibilityGeneration += 1
         let generation = visibilityGeneration
 
-        fadeContent(toVisible: false)
+        animateContent(toVisible: false)
         guard !Self.reduceMotion else {
             finishHiding(generation: generation, restoringFocus: restoringFocus)
             return
@@ -134,29 +138,84 @@ final class OverlayController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Fades the panel's content in or out. The final opacity is set first and the fade only animates the way
-    /// there, so the overlay ends up right even when no animation runs, for example while the display sleeps.
-    /// The window's own alpha is never animated: `NSWindow.animator()` can leave it stuck at the start value.
-    private func fadeContent(toVisible isVisible: Bool) {
+    /// Fades the panel's content in or out, and zooms the SwiftUI content in from slightly larger or out to it. The
+    /// final values are set first and the animations only show the way there, so the overlay ends up right even
+    /// when no animation runs, for example while the display sleeps. The window's own alpha is never animated:
+    /// `NSWindow.animator()` can leave it stuck at the start value.
+    ///
+    /// Both run in Core Animation, so SwiftUI draws no frame of them. A SwiftUI scale would redraw every label at
+    /// each frame's size, and CoreGraphics keeps the glyphs of every size it draws: about 0.3 MB and 0.14 s of CPU
+    /// for each show and hide.
+    private func animateContent(toVisible isVisible: Bool) {
         guard let content = panel.contentView else {
             return
         }
-        let target: CGFloat = isVisible ? 1 : 0
-        let start = content.layer?.presentation()?.opacity ?? Float(content.alphaValue)
-        content.alphaValue = target
-        guard !Self.reduceMotion, let layer = content.layer else {
+        let opacity: Float = isVisible ? 1 : 0
+        let startOpacity = content.layer?.presentation()?.opacity ?? Float(content.alphaValue)
+        let zoomLayer = panel.hostingView?.layer
+        // Mid-zoom, the zoom goes on from where it is; otherwise from the value just set, which the presentation
+        // layer shows only after the next commit.
+        let startZoom = zoomLayer.map { layer in
+            layer.animation(forKey: "zoom") == nil
+                ? layer.sublayerTransform : layer.presentation()?.sublayerTransform ?? layer.sublayerTransform
+        }
+        content.alphaValue = CGFloat(opacity)
+        setContentZoom(isZoomedOut: !isVisible)
+        guard !Self.reduceMotion else {
             return
         }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = start
-        fade.toValue = Float(target)
-        fade.duration = Self.animationDuration
-        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        layer.add(fade, forKey: "fade")
+        content.layer?.add(Self.contentAnimation("opacity", from: startOpacity, to: opacity), forKey: "fade")
+        if let zoomLayer, let startZoom {
+            let zoom = Self.contentAnimation(
+                "sublayerTransform",
+                from: NSValue(caTransform3D: startZoom),
+                to: NSValue(caTransform3D: zoomLayer.sublayerTransform)
+            )
+            zoomLayer.add(zoom, forKey: "zoom")
+        }
+    }
+
+    /// Sets the SwiftUI content's zoom at once: larger by `zoomedOutScale` about its center, or at its size. With
+    /// Reduce Motion it always stays at its size.
+    private func setContentZoom(isZoomedOut: Bool) {
+        guard let view = panel.hostingView, let layer = view.layer else {
+            return
+        }
+        var transform = CATransform3DIdentity
+        if isZoomedOut, !Self.reduceMotion {
+            // A sublayer transform applies about the layer's anchor point, which AppKit keeps at the view's origin.
+            // The view's bounds are current at once; AppKit can update the layer's geometry later.
+            let center = CGPoint(
+                x: (0.5 - layer.anchorPoint.x) * view.bounds.width,
+                y: (0.5 - layer.anchorPoint.y) * view.bounds.height
+            )
+            let scale = Self.zoomedOutScale
+            transform = CATransform3DConcat(
+                CATransform3DConcat(
+                    CATransform3DMakeTranslation(-center.x, -center.y, 0),
+                    CATransform3DMakeScale(scale, scale, 1)
+                ),
+                CATransform3DMakeTranslation(center.x, center.y, 0)
+            )
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.sublayerTransform = transform
+        CATransaction.commit()
+    }
+
+    private static func contentAnimation(_ keyPath: String, from start: Any, to end: Any) -> CABasicAnimation {
+        let animation = CABasicAnimation(keyPath: keyPath)
+        animation.fromValue = start
+        animation.toValue = end
+        animation.duration = animationDuration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        return animation
     }
 
     /// Draws the grid's icons in the background, so showing the overlay does not draw them: every placed app at
-    /// the grid's icon size, and the first nine apps of each folder at the folder icon's small size.
+    /// the grid's icon size, and the first nine apps of each folder at the folder icon's small size. First it drops
+    /// the icons nothing shows any more.
     func prewarmIcons() {
         guard let screen = NSScreen.screens.first else {
             return
@@ -166,6 +225,10 @@ final class OverlayController: NSObject, NSWindowDelegate {
             columns: store.preferences.gridColumns,
             rows: store.preferences.gridRows
         )
+        // Before the first scan the catalog is empty, which would drop every icon.
+        if store.hasLoaded {
+            icons.prune(keepingAppsIn: store.catalog, gridIconSide: metrics.iconSize)
+        }
         let miniSide = FolderIcon.miniSide(forSide: metrics.iconSize)
         var requests: [(app: InstalledApp, side: CGFloat)] = []
         for item in store.layout.pages.flatMap(\.items) {

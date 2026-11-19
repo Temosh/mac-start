@@ -3,16 +3,24 @@ import os
 
 /// Finds the installed apps under a set of app folders.
 ///
-/// An app is a `.app` bundle with an `Info.plist`, found recursively without looking inside bundles. Names
-/// starting with a dot are skipped. A symbolic link to an app counts as that app. When a link and its target are
-/// both found, the app is kept once, under the target's path. The scan does file I/O, so run it off the main
-/// actor.
+/// An app is a `.app` bundle with an `Info.plist`, found up to `maxDepth` levels below a root without looking
+/// inside bundles. Names starting with a dot are skipped. A symbolic link to an app counts as that app. When a link
+/// and its target are both found, the app is kept once, under the target's path. The scan does file I/O, so run it
+/// off the main actor.
 public struct CatalogScanner: Sendable {
+    /// How many levels below a root apps are found by default. Unity Hub keeps its editors five levels down
+    /// (`/Applications/Unity/Hub/Editor/<version>/Unity.app`). Deeper folders hold content such as SDKs: tens of
+    /// thousands of files under one Unity install made each scan cost about 0.4 s.
+    public static let defaultMaxDepth = 5
+
     /// The folders to scan. Missing folders are skipped.
     public let roots: [URL]
+    /// How many levels below a root apps are found: 1 for apps directly in a root.
+    public let maxDepth: Int
 
-    public init(roots: [URL]) {
+    public init(roots: [URL], maxDepth: Int = defaultMaxDepth) {
         self.roots = roots
+        self.maxDepth = maxDepth
     }
 
     /// `/Applications`, `/System/Applications`, and `~/Applications`.
@@ -30,7 +38,7 @@ public struct CatalogScanner: Sendable {
 
     /// Scans every root and returns the apps found.
     public func scan() -> Catalog {
-        let candidates = roots.flatMap(Self.bundleCandidates(under:))
+        let candidates = roots.flatMap { Self.bundleCandidates(under: $0, maxDepth: maxDepth) }
         // Real bundles before symbolic links, then by path, so duplicates resolve the same way every time.
         let ordered = candidates.sorted { ($0.isSymbolicLink ? 1 : 0, $0.path) < ($1.isSymbolicLink ? 1 : 0, $1.path) }
 
@@ -54,7 +62,7 @@ public struct CatalogScanner: Sendable {
         let isSymbolicLink: Bool
     }
 
-    private static func bundleCandidates(under root: URL) -> [BundleCandidate] {
+    private static func bundleCandidates(under root: URL, maxDepth: Int) -> [BundleCandidate] {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: root.path(percentEncoded: false), isDirectory: &isDirectory),
             isDirectory.boolValue
@@ -83,12 +91,16 @@ public struct CatalogScanner: Sendable {
         var candidates: [BundleCandidate] = []
         for case let url as URL in enumerator {
             let isDotName = url.lastPathComponent.hasPrefix(".")
-            guard isDotName || url.pathExtension.lowercased() == "app" else {
+            let isApp = !isDotName && url.pathExtension.lowercased() == "app"
+            // A folder whose contents are not scanned: one with a dot name, or one at the depth limit. The root's
+            // entries are at level 1.
+            let isPruned = isDotName || (!isApp && enumerator.level >= maxDepth)
+            guard isApp || isPruned else {
                 continue
             }
             do {
                 let values = try url.resourceValues(forKeys: keys)
-                if isDotName {
+                if isPruned {
                     // Only after a directory: after a file, `skipDescendants()` skips the rest of its folder.
                     if values.isDirectory == true {
                         enumerator.skipDescendants()

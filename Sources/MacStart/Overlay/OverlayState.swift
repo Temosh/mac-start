@@ -10,7 +10,7 @@ final class OverlayState {
     /// How long a folder's panel takes to grow out of its icon or to shrink back into it.
     static let folderZoomDuration = 0.2
 
-    /// Drives the show and hide animation.
+    /// True from the moment the overlay shows until it starts to hide.
     var isPresented = false
     /// The page the grid shows.
     var currentPage = 0
