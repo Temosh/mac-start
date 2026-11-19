@@ -195,7 +195,10 @@ final class OverlayController: NSObject, NSWindowDelegate {
     /// instead of starting from rest. `changes` run in the same transaction as the page turn; see
     /// `turnPage(initialVelocity:after:)`.
     func showPage(_ index: Int, velocity: CGFloat = 0, alongWith changes: () -> Void = {}) {
-        let page = min(max(index, 0), max(store.layout.pages.count - 1, 0))
+        // During a drag, the changes can add the new page after the last one, so one more page is allowed here;
+        // the turn clamps again once the changes are made.
+        let lastPage = max(store.layout.pages.count - 1, 0) + (state.drag == nil ? 0 : 1)
+        let page = min(max(index, 0), lastPage)
         let start = -CGFloat(state.currentPage) * panel.frame.width + state.pageOffset
         let distance = -CGFloat(page) * panel.frame.width - start
         // The spring takes its starting speed relative to the distance it covers.
@@ -216,14 +219,19 @@ final class OverlayController: NSObject, NSWindowDelegate {
             guard let page = change() else {
                 return
             }
-            // Clamped after the change, which can add or remove pages.
-            state.currentPage = min(max(page, 0), max(store.layout.pages.count - 1, 0))
+            // Clamped after the change, which can add or remove pages, or the new page a drag waits on.
+            state.currentPage = min(max(page, 0), lastShownPage)
             state.pageOffset = 0
         }
     }
 
     private func turnPage(by offset: Int) {
         showPage(state.currentPage + offset)
+    }
+
+    /// The last page the pager shows: the layout's last page, or the new page a drag waits on after it.
+    private var lastShownPage: Int {
+        max(store.layout.pages.count - 1, 0) + (state.drag?.isOnNewPage == true ? 1 : 0)
     }
 
     private func launch(_ app: InstalledApp) {

@@ -90,6 +90,26 @@ struct LayoutEditingTests {
         #expect(layout.pages == [Page(items: [.app(b)]), Page(items: [.app(a)])])
     }
 
+    @Test func anAppTakenOutOfAFolderCanStartANewPage() {
+        let folder = Folder(name: "Trio", apps: [a, b, c])
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(d)])])
+
+        let isMoved = layout.moveItem(
+            from: .inFolder(folder.id, index: 2), to: GridPosition(page: 1, slot: 0), pageCapacity: capacity)
+
+        #expect(isMoved)
+        let rest = Folder(id: folder.id, name: "Trio", apps: [a, b])
+        #expect(layout.pages == [Page(items: [.folder(rest), .app(d)]), Page(items: [.app(c)])])
+    }
+
+    @Test func movingThePageOnlyItemToANewPageRemovesTheEmptiedPage() {
+        var layout = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(b)])])
+
+        layout.moveItem(from: slot(0, 0), to: GridPosition(page: 2, slot: 0), pageCapacity: capacity)
+
+        #expect(layout.pages == [Page(items: [.app(b)]), Page(items: [.app(a)])])
+    }
+
     @Test func movesAnAppOutOfAFolderAndDissolvesAFolderLeftWithOneApp() {
         let folder = Folder(name: "Pair", apps: [a, b])
         var layout = Layout(pages: [Page(items: [.folder(folder), .app(c)])])

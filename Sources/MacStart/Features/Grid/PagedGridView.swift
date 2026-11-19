@@ -30,6 +30,22 @@ struct PagedGridView: View {
                 )
                 .frame(width: metrics.overlaySize.width, height: metrics.overlaySize.height)
             }
+            // While a drag waits past the last page, a new, empty page follows it. A drop there makes it real.
+            if drag?.isOnNewPage == true {
+                PageView(
+                    items: [],
+                    pageIndex: pages.count,
+                    pageCount: pages.count + 1,
+                    selectedSlot: nil,
+                    drag: drag,
+                    state: state,
+                    metrics: metrics,
+                    store: store,
+                    icons: icons,
+                    actions: actions
+                )
+                .frame(width: metrics.overlaySize.width, height: metrics.overlaySize.height)
+            }
         }
         .frame(width: metrics.overlaySize.width, height: metrics.overlaySize.height, alignment: .leading)
         .modifier(PagerOffset(state: state, pageWidth: metrics.overlaySize.width))
@@ -203,26 +219,43 @@ struct PageView: View {
     }
 }
 
-/// The dots under the grid, one per page. A click on a dot shows that page.
+/// The dots under the grid, one per page. A click on a dot shows that page. While a drag waits on the new page
+/// after the last one, a faint extra dot stands for it.
 struct PageIndicator: View {
     let pageCount: Int
     let currentPage: Int
+    /// True while a drag waits on the new page after the last one.
+    let showsNewPage: Bool
     let isHighContrast: Bool
     let select: (Int) -> Void
 
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(0..<pageCount, id: \.self) { page in
+            ForEach(0..<(pageCount + (showsNewPage ? 1 : 0)), id: \.self) { page in
+                let isNewPage = page == pageCount
                 Circle()
-                    .fill(page == currentPage ? Color.white : Color.white.opacity(isHighContrast ? 0.6 : 0.35))
+                    .fill(color(isCurrent: page == currentPage, isNewPage: isNewPage))
                     .frame(width: 8, height: 8)
                     .padding(5)
                     .contentShape(Circle())
-                    .onTapGesture { select(page) }
+                    .onTapGesture {
+                        if !isNewPage {
+                            select(page)
+                        }
+                    }
                     .accessibilityElement()
-                    .accessibilityLabel("Page \(page + 1) of \(pageCount)")
+                    .accessibilityLabel(isNewPage ? "New page" : "Page \(page + 1) of \(pageCount)")
                     .accessibilityAddTraits(page == currentPage ? [.isButton, .isSelected] : .isButton)
             }
         }
+    }
+
+    /// The current page's dot is white, the others dim. The new page's dot stays faint even while it is shown,
+    /// because the page exists only until the drag ends.
+    private func color(isCurrent: Bool, isNewPage: Bool) -> Color {
+        if isNewPage {
+            return .white.opacity(isHighContrast ? 0.8 : 0.6)
+        }
+        return isCurrent ? .white : .white.opacity(isHighContrast ? 0.6 : 0.35)
     }
 }

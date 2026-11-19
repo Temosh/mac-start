@@ -40,7 +40,7 @@ The developer agreed to this design after an investigation. Each phase, and each
 
 ### Phase 3: later builds, one at a time
 
-- Dragging past the last page creates a page. The dragged tile rests at the right edge of the last page, and the pager turns to a temporary empty page with a faint extra dot. A drop there makes the page real; leaving it removes the page. `LayoutEditing.moveItem` already adds a page for a destination one page past the last. `DragCoordinator.turnPage` currently stops at the last page.
+- (Done.) Dragging past the last page creates a page. The dragged tile rests at the right edge of the last page, and the pager turns to a temporary empty page with a faint extra dot. A drop there makes the page real; leaving it removes the page. `LayoutEditing.moveItem` already adds a page for a destination one page past the last. `DragCoordinator.turnPage` currently stops at the last page.
 - Rectangle selection by dragging on empty space in edit mode. The overlay-wide drag gesture already detects presses that hit no tile.
 - Dragging several selected tiles at once: not planned for now. The developer chose no dragging in edit mode instead.
 
@@ -72,4 +72,5 @@ The developer agreed to this design after an investigation. Each phase, and each
 - Edit mode has no dragging, by the developer's choice; its actions move items.
 - Phase 2, build 2 is committed and confirmed by hand: right-click on a selected tile in edit mode gives the selection's actions (`SelectionMenuItems`); every app and folder menu has Move to Page (`PageMenuItems`), which also works from inside a folder and closes it.
 - Phase 2, build 3 is committed and confirmed by hand: edit mode inside an open folder. In edit mode a click on a folder opens it, as outside edit mode, and a click on any tile's round badge selects or deselects it (`EditBadge` takes its own clicks; VoiceOver gets a Select action). Inside a folder, selecting works as in the grid, over the folder's apps. The action bar sits above the folder panel and adds Remove from Folder (`Layout.removeApps(_:fromFolder:pageCapacity:)`, tested in `BatchEditingTests`). Entering edit mode no longer closes an open folder. A folder that an edit dissolves closes its panel.
+- Phase 3, build 1 is confirmed by hand on 2026-11-19: resting a dragged item at the right edge of the last page turns to a new, empty page with a faint extra dot (`DragSession.isOnNewPage`). A drop there adds the page through `Layout.moveItem`; turning back, Escape, or closing the overlay takes it away. It does not open when the dragged item is the last page's only item. 121 tests pass, 2 new in `LayoutEditingTests`.
 - Selecting a folder never waits. The developer rejected a pause before a folder's checkmark, used to tell a click from a double-click, because users would read it as lag. They also rejected ignoring the second click of a double-click.

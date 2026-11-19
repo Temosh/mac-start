@@ -162,13 +162,15 @@ struct OverlayView: View {
     }
 
     private var showsPageDots: Bool {
-        store.hasLoaded && !state.isSearching && !store.layout.placedAppIDs.isEmpty && store.layout.pages.count > 1
+        store.hasLoaded && !state.isSearching && !store.layout.placedAppIDs.isEmpty
+            && (store.layout.pages.count > 1 || state.drag?.isOnNewPage == true)
     }
 
     private var pageDots: some View {
         PageIndicator(
             pageCount: store.layout.pages.count,
             currentPage: state.currentPage,
+            showsNewPage: state.drag?.isOnNewPage == true,
             isHighContrast: contrast == .increased,
             select: { actions.showPage($0) }
         )

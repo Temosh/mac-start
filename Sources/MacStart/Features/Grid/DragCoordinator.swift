@@ -3,8 +3,8 @@ import Foundation
 import MacStartCore
 
 /// Turns a drag gesture into Launchpad behavior: the other icons make room where the dragged icon rests, resting
-/// it on an icon makes a folder, resting at a screen edge turns the page, and leaving the open folder takes the
-/// app out.
+/// it on an icon makes a folder, resting at a screen edge turns the page, resting at the right edge of the last
+/// page turns to a new, empty page, and leaving the open folder takes the app out.
 ///
 /// Icons only make room after the dragged icon pauses between them. Moving the dragged icon onto a neighbor
 /// therefore never pushes the neighbor away before the folder delay can start.
@@ -111,15 +111,23 @@ final class DragCoordinator {
             store.dropApp(from: drag.source, onto: GridPosition(page: drag.page, slot: target))
         } else {
             let slot = pendingSlot ?? drag.gapSlot ?? itemCountWithoutDraggedItem(onPage: drag.page, drag: drag)
-            store.moveItem(from: drag.source, to: GridPosition(page: drag.page, slot: slot))
+            // A drop on the new page adds it to the layout.
+            let isMoved = store.moveItem(from: drag.source, to: GridPosition(page: drag.page, slot: slot))
+            if drag.isOnNewPage, !isMoved {
+                showPage(store.layout.pages.count - 1) {}
+            }
         }
     }
 
-    /// Drops nothing and puts everything back.
+    /// Drops nothing and puts everything back. A new page the drag waited on goes away with it.
     func cancel() {
         stopTimers()
-        state.drag = nil
         lastDragEnd = .now
+        if state.drag?.isOnNewPage == true {
+            showPage(store.layout.pages.count - 1) { state.drag = nil }
+        } else {
+            state.drag = nil
+        }
     }
 
     /// A tile under a press: where it sits, what it holds, and its center.
@@ -316,12 +324,18 @@ final class DragCoordinator {
             return
         }
         let page = drag.page + offset
-        guard store.layout.pages.indices.contains(page) else {
+        let pageCount = store.layout.pages.count
+        // Past the last page waits a new, empty page. It opens only when the last page keeps items without the
+        // dragged one, since otherwise the new page would just take that page's place.
+        let opensNewPage =
+            page == pageCount && itemCountWithoutDraggedItem(onPage: pageCount - 1, drag: drag) > 0
+        guard store.layout.pages.indices.contains(page) || opensNewPage else {
             return
         }
         stopFolderTimer()
         stopReflowTimer()
         drag.page = page
+        drag.isOnNewPage = opensNewPage
         drag.folderTargetSlot = nil
         let tileCenter = drag.tileCenter(for: state.dragLocation)
         let count = itemCountWithoutDraggedItem(onPage: page, drag: drag)

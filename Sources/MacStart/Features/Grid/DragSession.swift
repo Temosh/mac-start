@@ -20,6 +20,8 @@ struct DragSession: Equatable {
     var folderGapIndex: Int?
     /// True while `page` has no room for the dragged item. No edit pushes items to the next page.
     var isPageFull = false
+    /// True while the drag is over the new, empty page after the last one, which a drop there makes real.
+    var isOnNewPage = false
 
     /// True when a drop now would put the item back: over a page with no room, except onto a folder target.
     var isDropRefused: Bool {
