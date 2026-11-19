@@ -5,12 +5,14 @@ A native app launcher for macOS 27 that brings back the classic Launchpad experi
 ## Features
 
 - Fullscreen overlay on the main display, with pages, folders, and type-to-search.
-- Global hotkey to toggle it. Bind a trackpad gesture to the hotkey with a gesture tool of your choice.
-- Hide apps you never launch from the grid.
+- Global hotkey or the Dock icon to toggle it. Bind a trackpad gesture to the hotkey with a gesture tool of your choice.
+- Drag icons to arrange pages and folders, and past the last page to start a new one.
+- Edit mode to select several apps and folders, by click or with a rectangle, and move, group, or hide them at once.
+- Hide apps you never launch from the grid, and find them again in Settings.
 - Each installed app appears exactly once. The grid follows installs and removals.
 - Export and import your full setup (layout and preferences) as one JSON file, for easy migration to a new Mac.
 
-The project is in early development. The current status is in [docs/project-brief.md](docs/project-brief.md).
+Version 1 is complete: every goal in [docs/project-brief.md](docs/project-brief.md) works.
 
 ## Requirements
 

@@ -30,20 +30,22 @@ Sources/
     Persistence/           JSON format, layout.json store, preferences store, export/import
     Search/                Search matching and ranking
     Navigation/            Keyboard selection across pages, and where a swipe lands
-    Editing/               Moves, folder creation, and folder edits from drag and drop
+    Editing/               Moves, folders, batch edits for edit mode, hide and unhide
     LogArea.swift          Logger categories shared by both modules
   MacStart/                Executable. App entry and everything AppKit/SwiftUI.
     App/                   Entry point, AppDelegate, dependency wiring, LayoutStore
     Overlay/               Overlay window and controller, show/hide, display choice
     Features/
-      Grid/                Pages, icons, paging, drag and drop
-      Folders/             Folder open/close, rename
-      Search/              Type-to-search, keyboard navigation
-      Settings/            Hotkey, grid size, launch at login, hidden apps, export/import
+      Grid/                The overlay view, pages, tiles and hover, paging, search results, drag and
+                           drop, the selection rectangle
+      Folders/             Folder panel, its zoom, rename
+      Editing/             Edit mode: badges, the action bar, selection menus
+      Settings/            Settings window panes: shortcut, launch at login, grid size, Reset Layout,
+                           hidden apps, backup
     Platform/              Thin adapters: GlobalHotKey, CatalogWatcher, IconProvider,
                            AppLauncher, LoginItem, KeyNames
 Tests/
-  MacStartCoreTests/       Swift Testing; reconcile, codec, catalog scan fixtures
+  MacStartCoreTests/       Swift Testing; reconcile, editing, search, navigation, codec, catalog scan fixtures
 Support/
   Info.plist               Bundle metadata; copied into the .app by the build script
   AppIcon.iconset/         Placeholder icon PNGs; converted to AppIcon.icns with iconutil
@@ -54,7 +56,7 @@ scripts/
   build.yml                CI: build, test, package, artifact, release on tag
 ```
 
-These folders are the agreed layout. They are created as the code is written.
+This is the layout as built.
 
 ## Module Boundaries
 
@@ -73,7 +75,7 @@ These folders are the agreed layout. They are created as the code is written.
 | Paging | A custom pager: the pages sit in one row that a two-finger swipe moves with the fingers, then a spring settles it on a page (`PageSwipe` decides which). Not SwiftUI's paging scroll view. A page turn and the state that goes with it, such as the keyboard selection, the drag's page, or the edit whose result the turn shows, change in one SwiftUI transaction | The paging scroll view needed long swipes and gave no control over the decision. Changed in two transactions, SwiftUI could draw the pager with the old page and then miss the new one |
 | Smooth motion | Swipe offset and drag pointer are separate state, read only in small modifiers. Icons are pre-sized bitmaps, drawn off the main actor after each scan and when the overlay opens. Only label text has a shadow. The settle spring starts at the swipe's speed. Every page is built, not only the pages near the shown one | Swipe and drag frames move views without rebuilding or re-rendering the tiles, opening the overlay draws no icons, and a flick flows into the settle. With a few pages, lazy pages save little, and they would have to keep every page built that a long swipe or an interrupted jump across pages can show |
 | Keyboard | A local key monitor takes the arrow keys, Return, and Escape before the focused search field; every other key goes to the field | Typing searches at once, while the grid stays keyboard driven |
-| Drag and drop | One SwiftUI drag gesture for the whole overlay, with a coordinator that finds the tile whose cell holds the press; not system drag and drop, so icons make room live. Tiles carry no gestures, so a folder panel closes as soon as a drag leaves it. A full page opens no gap, so a drop never pushes icons to the next page ([ADR 0001](adr/0001-never-push-items-to-the-next-page.md)) | Launchpad-like reflow, folder creation by resting on an icon, and page turns at the screen edges |
+| Drag and drop | One SwiftUI drag gesture for the whole overlay, with a coordinator that finds the tile whose cell holds the press; not system drag and drop, so icons make room live. Tiles carry no gestures, so a folder panel closes as soon as a drag leaves it. A full page opens no gap, so a drop never pushes icons to the next page (see the editing rules in [domain-model.md](domain-model.md#editing)) | Launchpad-like reflow, folder creation by resting on an icon, and page turns at the screen edges |
 | Show and hide animation | The content view's layer fades with an explicit Core Animation fade, after its final opacity is set; SwiftUI scales the content | `NSWindow.animator()` alpha can stall at its start value, for example while the display sleeps, which would leave an invisible overlay |
 | Target display | `NSScreen.screens.first`, the display that holds the menu bar | `NSScreen.main` follows keyboard focus, which is not the main display |
 | Background | `NSVisualEffectView` blur behind the grid | Native look like Launchpad |

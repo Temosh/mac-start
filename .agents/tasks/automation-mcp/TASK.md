@@ -83,7 +83,7 @@ Things to know before building the UI tools:
 - New `docs/automation.md`: launch, profile mode, tools, safety, limits. Add it to the doc table and commands in `AGENTS.md`.
 - `docs/architecture.md`: source layout, a platform-choice row, and the Testing Strategy.
 - `.agents/rules/stack.md`: a local Unix socket only under `--automation`, the `automation` log category, the allowed synthetic event use.
-- ADR `docs/adr/0001-add-flag-gated-automation-mcp-server.md` and the index `docs/adr/README.md` (neither exists yet). Rejected alternatives: TCP or HTTP transport, Accessibility-based UI scripting, an AppleScript dictionary, a third-party MCP SDK, a Settings toggle, debug builds only.
+- If the choice passes the ADR test in `.agents/rules/documentation-and-diagrams.md`, ADR `docs/adr/0003-add-flag-gated-automation-mcp-server.md` and the index `docs/adr/README.md` (neither exists; 0001 and 0002 are in git history, deleted, and numbers are never reused). Otherwise the reasons go beside the facts in `docs/architecture.md`. Rejected alternatives: TCP or HTTP transport, Accessibility-based UI scripting, an AppleScript dictionary, a third-party MCP SDK, a Settings toggle, debug builds only.
 
 ### Suggested order
 
