@@ -50,6 +50,8 @@ final class OverlayState {
     var isEditingFolderName = false
     /// The drag in progress.
     var drag: DragSession?
+    /// The rectangle that selects tiles in edit mode, in overlay coordinates, while it is being drawn.
+    var selectionRectangle: CGRect?
     /// True in edit mode, where a click selects an item instead of opening it.
     var isEditing = false
     /// The items selected in edit mode. They stay selected across pages and searches.
@@ -131,6 +133,7 @@ final class OverlayState {
         query = ""
         selection = nil
         drag = nil
+        selectionRectangle = nil
         pageOffset = 0
         closeFolder()
         closingFolderID = nil

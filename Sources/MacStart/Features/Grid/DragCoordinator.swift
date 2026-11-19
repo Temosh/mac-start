@@ -31,6 +31,8 @@ final class DragCoordinator {
     private var lastDragEnd = Date.distantPast
     /// Where a press that hit no tile started, so moving that press drags nothing.
     private var ignoredPressLocation: CGPoint?
+    /// The selection rectangle in edit mode: where it started, and the selection it adds to.
+    private var rectangle: (start: CGPoint, baseSelection: Set<Item.ID>)?
 
     init(store: LayoutStore, state: OverlayState, showPage: @escaping (Int, () -> Void) -> Void) {
         self.store = store
@@ -41,20 +43,37 @@ final class DragCoordinator {
     /// True during a drag and right after it, so the button under the pointer does not take the release as a
     /// click.
     var suppressesClick: Bool {
-        state.drag != nil || Date.now.timeIntervalSince(lastDragEnd) < 0.3
+        state.drag != nil || rectangle != nil || Date.now.timeIntervalSince(lastDragEnd) < 0.3
+    }
+
+    /// True while a selection rectangle is being drawn in edit mode.
+    var isSelectingRectangle: Bool {
+        rectangle != nil
     }
 
     /// One step of the overlay's drag gesture. The first step finds the tile under the press. A press that hit no
-    /// tile, or any press in edit mode, drags nothing.
+    /// tile drags nothing. In edit mode, which moves items with its actions, a press on empty space draws a
+    /// rectangle that selects the tiles it touches, and a press on a tile drags nothing.
     func update(_ update: DragUpdate) {
+        if let rectangle {
+            updateRectangle(rectangle, to: update)
+            return
+        }
         if state.drag == nil {
             guard update.startLocation != ignoredPressLocation else {
                 return
             }
-            // Edit mode moves items with its actions, not by dragging.
-            guard
-                !state.isEditing,
-                let tile = grabbedTile(at: update.startLocation, grid: update.grid, folderPanel: update.folderPanel)
+            if state.isEditing {
+                if canStartRectangle(at: update.startLocation, grid: update.grid) {
+                    let rectangle = (start: update.startLocation, baseSelection: state.editSelection)
+                    self.rectangle = rectangle
+                    updateRectangle(rectangle, to: update)
+                } else {
+                    ignoredPressLocation = update.startLocation
+                }
+                return
+            }
+            guard let tile = grabbedTile(at: update.startLocation, grid: update.grid, folderPanel: update.folderPanel)
             else {
                 ignoredPressLocation = update.startLocation
                 return
@@ -93,9 +112,15 @@ final class DragCoordinator {
         }
     }
 
-    /// Commits the drop.
+    /// Commits the drop, or keeps what a selection rectangle selected.
     func end() {
         ignoredPressLocation = nil
+        if rectangle != nil {
+            rectangle = nil
+            state.selectionRectangle = nil
+            lastDragEnd = .now
+            return
+        }
         guard let drag = state.drag else {
             return
         }
@@ -119,14 +144,61 @@ final class DragCoordinator {
         }
     }
 
-    /// Drops nothing and puts everything back. A new page the drag waited on goes away with it.
+    /// Drops nothing and puts everything back. A new page the drag waited on goes away with it, and a selection
+    /// rectangle leaves the selection as it was before.
     func cancel() {
         stopTimers()
         lastDragEnd = .now
+        if let rectangle {
+            state.editSelection = rectangle.baseSelection
+            self.rectangle = nil
+            state.selectionRectangle = nil
+        }
         if state.drag?.isOnNewPage == true {
             showPage(store.layout.pages.count - 1) { state.drag = nil }
         } else {
             state.drag = nil
+        }
+    }
+
+    // MARK: - Selection rectangle
+
+    /// The items the overlay shows: the search results, or the current page.
+    private var shownItems: [Item] {
+        if state.isSearching {
+            return store.searchResults(matching: state.query).map { .app($0.id) }
+        }
+        let pages = store.layout.pages
+        return pages.indices.contains(state.currentPage) ? pages[state.currentPage].items : []
+    }
+
+    /// A rectangle starts on empty space outside every tile, between the top and bottom of the grid, where no
+    /// control sits; the side margins count too. Not inside an open folder.
+    private func canStartRectangle(at point: CGPoint, grid: GridMetrics) -> Bool {
+        guard state.openFolderID == nil, (grid.gridFrame.minY...grid.gridFrame.maxY).contains(point.y) else {
+            return false
+        }
+        guard grid.gridFrame.contains(point) else {
+            return true
+        }
+        let slot = grid.slot(at: point)
+        return !(slot < shownItems.count && grid.tileFrame(ofSlot: slot).contains(point))
+    }
+
+    /// Selects the tiles the rectangle touches, on top of the selection from before it. Tiles it leaves go back.
+    private func updateRectangle(_ rectangle: (start: CGPoint, baseSelection: Set<Item.ID>), to update: DragUpdate) {
+        let frame = CGRect(
+            x: min(rectangle.start.x, update.location.x),
+            y: min(rectangle.start.y, update.location.y),
+            width: abs(update.location.x - rectangle.start.x),
+            height: abs(update.location.y - rectangle.start.y)
+        )
+        state.selectionRectangle = frame
+        let items = shownItems
+        let touched = items.indices.filter { update.grid.tileFrame(ofSlot: $0).intersects(frame) }.map { items[$0].id }
+        let selection = rectangle.baseSelection.union(touched)
+        if state.editSelection != selection {
+            state.editSelection = selection
         }
     }
 

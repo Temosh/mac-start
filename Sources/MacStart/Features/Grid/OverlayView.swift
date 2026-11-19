@@ -68,6 +68,7 @@ struct OverlayView: View {
                 .animation(reduceMotion ? nil : .easeOut(duration: OverlayState.folderZoomDuration)) { grid in
                     grid.blur(radius: state.openFolderID == nil ? 0 : Self.folderBackdropBlur)
                 }
+                SelectionRectangleLayer(state: state, isHighContrast: contrast == .increased)
                 folderPanel(metrics: metrics)
                 SearchField(
                     query: $state.query,
@@ -311,6 +312,27 @@ struct OverlayView: View {
             .font(.title2)
             .foregroundStyle(.white.opacity(0.85))
             .allowsHitTesting(false)
+    }
+}
+
+/// The rectangle that selects tiles in edit mode: translucent white with a lighter edge, as in Finder. It reads the
+/// rectangle itself, so pointer moves redraw only this view.
+struct SelectionRectangleLayer: View {
+    let state: OverlayState
+    let isHighContrast: Bool
+
+    var body: some View {
+        if let frame = state.selectionRectangle {
+            Rectangle()
+                .fill(.white.opacity(isHighContrast ? 0.18 : 0.12))
+                .overlay {
+                    Rectangle()
+                        .strokeBorder(.white.opacity(isHighContrast ? 0.9 : 0.55), lineWidth: 1)
+                }
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+                .allowsHitTesting(false)
+        }
     }
 }
 

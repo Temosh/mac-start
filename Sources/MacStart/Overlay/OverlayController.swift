@@ -310,7 +310,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
         guard panel.isKeyWindow, !hasModifiers, !isComposingText else {
             return false
         }
-        if state.drag != nil {
+        if state.drag != nil || drags.isSelectingRectangle {
             guard keyCode == kVK_Escape else {
                 return false
             }

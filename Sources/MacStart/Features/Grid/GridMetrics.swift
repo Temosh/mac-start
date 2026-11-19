@@ -93,6 +93,18 @@ struct GridMetrics: Equatable {
         return CGPoint(x: slotCenter.x, y: slotCenter.y - style.height / 2 + style.padding + iconSize / 2)
     }
 
+    /// The tile in a slot: its click area and highlight, centered in the cell.
+    func tileFrame(ofSlot slot: Int) -> CGRect {
+        let style = tileStyle
+        let center = center(ofSlot: slot)
+        return CGRect(
+            x: center.x - style.width / 2,
+            y: center.y - style.height / 2,
+            width: style.width,
+            height: style.height
+        )
+    }
+
     /// Where the buttons beside the search field end: at the right edge of the last column's icons.
     var toolbarTrailingX: CGFloat {
         gridFrame.maxX - (cellSize.width - iconSize) / 2
