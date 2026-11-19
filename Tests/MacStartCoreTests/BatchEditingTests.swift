@@ -91,6 +91,114 @@ struct BatchEditingTests {
         #expect(layout == original)
     }
 
+    // MARK: - Move to folder
+
+    @Test func movesAppsToTheEndOfAFolderInReadingOrder() {
+        let folder = Folder(name: "Pair", apps: [a, b])
+        let e = appID("E")
+        var layout = Layout(pages: [Page(items: [.app(c), .folder(folder)]), Page(items: [.app(d), .app(e)])])
+
+        let isMoved = layout.moveApps([e, c], toFolder: folder.id, pageCapacity: capacity)
+
+        let filled = Folder(id: folder.id, name: "Pair", apps: [a, b, c, e])
+        #expect(isMoved)
+        #expect(layout.pages == [Page(items: [.folder(filled)]), Page(items: [.app(d)])])
+    }
+
+    @Test func anAppMovedFromAnotherFolderLeavesItAndAFolderWithOneAppDissolves() {
+        let source = Folder(name: "Source", apps: [a, b])
+        let target = Folder(name: "Target", apps: [c, d])
+        var layout = Layout(pages: [Page(items: [.folder(source), .folder(target)])])
+
+        layout.moveApps([a], toFolder: target.id, pageCapacity: capacity)
+
+        let filled = Folder(id: target.id, name: "Target", apps: [c, d, a])
+        #expect(layout.pages == [Page(items: [.app(b), .folder(filled)])])
+    }
+
+    @Test func appsAlreadyInTheFolderStayInPlace() {
+        let folder = Folder(name: "Three", apps: [a, b, c])
+        var layout = Layout(pages: [Page(items: [.folder(folder), .app(d)])])
+
+        let isMoved = layout.moveApps([a, d], toFolder: folder.id, pageCapacity: capacity)
+
+        let filled = Folder(id: folder.id, name: "Three", apps: [a, b, c, d])
+        #expect(isMoved)
+        #expect(layout.pages == [Page(items: [.folder(filled)])])
+    }
+
+    @Test func movingOnlyAppsAlreadyInTheFolderIsRefused() {
+        let folder = Folder(name: "Pair", apps: [a, b])
+        let original = Layout(pages: [Page(items: [.folder(folder), .app(c)])])
+        var layout = original
+
+        let isMoved = layout.moveApps([a], toFolder: folder.id, pageCapacity: capacity)
+
+        #expect(!isMoved)
+        #expect(layout == original)
+        #expect(!original.canMoveApps([a], toFolder: folder.id, pageCapacity: capacity))
+        #expect(original.canMoveApps([c], toFolder: folder.id, pageCapacity: capacity))
+    }
+
+    @Test func anEmptiedPageGoesAwayWhenItsAppsMoveToAFolder() {
+        let folder = Folder(name: "Pair", apps: [a, b])
+        var layout = Layout(pages: [Page(items: [.app(c)]), Page(items: [.folder(folder)])])
+
+        layout.moveApps([c], toFolder: folder.id, pageCapacity: capacity)
+
+        let filled = Folder(id: folder.id, name: "Pair", apps: [a, b, c])
+        #expect(layout.pages == [Page(items: [.folder(filled)])])
+    }
+
+    @Test func listsFoldersInReadingOrder() {
+        let first = Folder(name: "First", apps: [a, b])
+        let second = Folder(name: "Second", apps: [c, d])
+        let layout = Layout(pages: [Page(items: [.folder(first)]), Page(items: [.app(appID("E")), .folder(second)])])
+
+        #expect(layout.foldersInReadingOrder == [first, second])
+    }
+
+    // MARK: - Shown page after an edit
+
+    @Test func theShownPageMovesBackWhenAnEarlierPageEmpties() {
+        let previous = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(b)]), Page(items: [.app(c), .app(d)])])
+        var layout = previous
+
+        layout.moveItems(ids(.app(a)), toPage: 1, pageCapacity: capacity)
+
+        #expect(layout.index(ofPage: 2, in: previous, taking: ids(.app(a))) == 1)
+        #expect(layout.index(ofPage: 1, in: previous, taking: ids(.app(a))) == 0)
+    }
+
+    @Test func theShownPageStaysWhenItsItemsGoElsewhere() {
+        let previous = Layout(pages: [Page(items: [.app(a), .app(b)]), Page(items: [.app(c)])])
+        var layout = previous
+
+        layout.moveItems(ids(.app(b)), toPage: 1, pageCapacity: capacity)
+
+        #expect(layout.index(ofPage: 0, in: previous, taking: ids(.app(b))) == 0)
+    }
+
+    @Test func aShownPageThatKeptNothingIsPlacedAfterTheNearestPageThatDid() {
+        let previous = Layout(pages: [Page(items: [.app(a)]), Page(items: [.app(b)]), Page(items: [.app(c)])])
+        var layout = previous
+
+        layout.moveItems(ids(.app(b)), toPage: 3, pageCapacity: capacity)
+
+        #expect(layout.pages == [Page(items: [.app(a)]), Page(items: [.app(c)]), Page(items: [.app(b)])])
+        #expect(layout.index(ofPage: 1, in: previous, taking: ids(.app(b))) == 1)
+    }
+
+    @Test func aFolderThatGainsAppsStillMarksItsPage() {
+        let folder = Folder(name: "Pair", apps: [a, b])
+        let previous = Layout(pages: [Page(items: [.app(c)]), Page(items: [.folder(folder), .app(d)])])
+        var layout = previous
+
+        layout.moveApps([c], toFolder: folder.id, pageCapacity: capacity)
+
+        #expect(layout.index(ofPage: 1, in: previous, taking: ids(.app(c))) == 0)
+    }
+
     // MARK: - Remove from folder
 
     @Test func removesAppsFromAFolderIntoTheSlotsAfterItInFolderOrder() {

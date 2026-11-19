@@ -7,6 +7,8 @@ enum EditAction {
     case newFolder
     /// Moves the selected items to the end of a page. One past the last page makes a new page.
     case moveToPage(Int)
+    /// Moves the selected apps to the end of a folder.
+    case moveToFolder(UUID)
     case hide
     /// Moves the selected apps of the open folder out, right after the folder.
     case removeFromFolder
@@ -39,6 +41,17 @@ struct EditSelectionSummary: Equatable {
     /// Why New Folder is unavailable, or nil when it is available.
     var newFolderHelp: String? {
         count >= 2 && hasOnlyApps ? nil : "Select two or more apps, and no folders"
+    }
+
+    /// Why Move to Folder is unavailable, or nil when it is available.
+    func moveToFolderHelp(folderCount: Int) -> String? {
+        if count == 0 {
+            return "Select apps first"
+        }
+        if !hasOnlyApps {
+            return "Works on apps only, not folders"
+        }
+        return folderCount > 0 ? nil : "There are no folders yet"
     }
 
     /// Why Hide is unavailable, or nil when it is available.
@@ -74,10 +87,58 @@ struct PageMenuItems: View {
     }
 }
 
+/// A folder listed in a Move to Folder menu.
+struct FolderChoice: Identifiable {
+    let id: UUID
+    /// The folder's name. When another folder has the same name, its first apps follow, since a folder is
+    /// recognized by what it holds: "Folder (Safari, Mail…)".
+    let title: String
+
+    /// How many app names tell folders with the same name apart.
+    private static var appNameCount: Int { 2 }
+
+    /// The folders of `layout` in reading order, without the folder with `excludedID`. `appName` names an app.
+    static func all(
+        in layout: MacStartCore.Layout,
+        excluding excludedID: UUID? = nil,
+        appName: (AppID) -> String?
+    ) -> [FolderChoice] {
+        let folders = layout.foldersInReadingOrder.filter { $0.id != excludedID }
+        let nameCounts = Dictionary(folders.map { ($0.name, 1) }, uniquingKeysWith: +)
+        return folders.map { folder in
+            guard (nameCounts[folder.name] ?? 0) > 1 else {
+                return FolderChoice(id: folder.id, title: folder.name)
+            }
+            let names = folder.apps.prefix(appNameCount).compactMap(appName).joined(separator: ", ")
+            let more = folder.apps.count > appNameCount ? "…" : ""
+            return FolderChoice(id: folder.id, title: "\(folder.name) (\(names)\(more))")
+        }
+    }
+}
+
+/// The items of a Move to Folder menu: every folder in reading order. A folder that already holds all the apps is
+/// unavailable.
+struct FolderMenuItems: View {
+    let folders: [FolderChoice]
+    /// True when at least one of the apps can move into the folder.
+    let canMove: @MainActor (UUID) -> Bool
+    let move: @MainActor (UUID) -> Void
+
+    var body: some View {
+        ForEach(folders) { folder in
+            Button(folder.title) {
+                move(folder.id)
+            }
+            .disabled(!canMove(folder.id))
+        }
+    }
+}
+
 /// The menu of a tile selected in edit mode. Its actions apply to the whole selection, as in Finder.
 struct SelectionMenuItems: View {
     let summary: EditSelectionSummary
     let pageCount: Int
+    let folders: [FolderChoice]
     /// True when an action fits without pushing items to the next page.
     let canPerform: @MainActor (EditAction) -> Bool
     let perform: @MainActor (EditAction) -> Void
@@ -87,17 +148,23 @@ struct SelectionMenuItems: View {
             perform(.newFolder)
         }
         .disabled(summary.newFolderHelp != nil || !canPerform(.newFolder))
-        Menu("Move Selection to Page") {
-            PageMenuItems(pageCount: pageCount, canMove: { canPerform(.moveToPage($0)) }) {
-                perform(.moveToPage($0))
-            }
-        }
         if summary.countInOpenFolder != nil {
             Button("Remove Selection from Folder") {
                 perform(.removeFromFolder)
             }
             .disabled(summary.removeFromFolderHelp != nil || !canPerform(.removeFromFolder))
         }
+        Menu("Move Selection to Page") {
+            PageMenuItems(pageCount: pageCount, canMove: { canPerform(.moveToPage($0)) }) {
+                perform(.moveToPage($0))
+            }
+        }
+        Menu("Move Selection to Folder") {
+            FolderMenuItems(folders: folders, canMove: { canPerform(.moveToFolder($0)) }) {
+                perform(.moveToFolder($0))
+            }
+        }
+        .disabled(summary.moveToFolderHelp(folderCount: folders.count) != nil)
         Button("Hide Selection") {
             perform(.hide)
         }
@@ -115,6 +182,7 @@ struct EditActionBar: View {
     /// The open folder, whose apps can be taken out with Remove from Folder.
     let openFolder: Folder?
     let pageCount: Int
+    let folders: [FolderChoice]
     let isHighContrast: Bool
     /// True when an action fits without pushing items to the next page.
     let canPerform: @MainActor (EditAction) -> Bool
@@ -135,7 +203,6 @@ struct EditActionBar: View {
                 perform(.newFolder)
             }
             .disabled(newFolderHelp != nil)
-            moveMenu
             if openFolder != nil {
                 let removeHelp =
                     summary.removeFromFolderHelp
@@ -145,6 +212,7 @@ struct EditActionBar: View {
                 }
                 .disabled(removeHelp != nil)
             }
+            moveMenu(summary: summary)
             barButton("Hide", systemImage: "eye.slash", help: summary.hideHelp) {
                 perform(.hide)
             }
@@ -167,13 +235,27 @@ struct EditActionBar: View {
         .accessibilityLabel("Edit actions")
     }
 
-    private var moveMenu: some View {
+    /// One menu for both kinds of destination: the pages, then the folders. Folders take apps only, so they are
+    /// unavailable while the selection holds a folder.
+    private func moveMenu(summary: EditSelectionSummary) -> some View {
         Menu {
-            PageMenuItems(pageCount: pageCount, canMove: { canPerform(.moveToPage($0)) }) {
-                perform(.moveToPage($0))
+            Section("Pages") {
+                PageMenuItems(pageCount: pageCount, canMove: { canPerform(.moveToPage($0)) }) {
+                    perform(.moveToPage($0))
+                }
+            }
+            if !folders.isEmpty {
+                Section("Folders") {
+                    FolderMenuItems(
+                        folders: folders,
+                        canMove: { summary.hasOnlyApps && canPerform(.moveToFolder($0)) }
+                    ) {
+                        perform(.moveToFolder($0))
+                    }
+                }
             }
         } label: {
-            Label("Move to Page", systemImage: "arrow.right.square")
+            Label("Move to", systemImage: "arrow.right.square")
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.visible)
@@ -181,7 +263,7 @@ struct EditActionBar: View {
         .padding(.horizontal, 10)
         .disabled(selection.isEmpty)
         .opacity(selection.isEmpty ? 0.4 : 1)
-        .help(selection.isEmpty ? "Select items first" : "Move the selected items to the end of a page")
+        .help(selection.isEmpty ? "Select items first" : "Move the selected items to the end of a page or folder")
     }
 
     private func barButton(

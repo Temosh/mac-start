@@ -11,6 +11,10 @@ struct OverlayActions {
     let moveItems: @MainActor (Set<Item.ID>, Int) -> Void
     /// True when the items fit on the page, since no edit pushes items to the next page.
     let canMoveItems: @MainActor (Set<Item.ID>, Int) -> Bool
+    /// Moves apps to the end of a folder, then shows the folder's page.
+    let moveAppsToFolder: @MainActor (Set<AppID>, UUID) -> Void
+    /// True when at least one of the apps is not in the folder yet.
+    let canMoveAppsToFolder: @MainActor (Set<AppID>, UUID) -> Bool
     let closeFolder: @MainActor () -> Void
     let renameFolder: @MainActor (UUID, String) -> Void
     let removeFromFolder: @MainActor (UUID, Int) -> Void
@@ -197,6 +201,7 @@ struct OverlayView: View {
                     selection: state.editSelection,
                     openFolder: state.openFolderID.flatMap { store.folder(withID: $0) },
                     pageCount: store.layout.pages.count,
+                    folders: store.folderChoices(),
                     isHighContrast: contrast == .increased,
                     canPerform: actions.canPerformEdit,
                     perform: actions.performEdit

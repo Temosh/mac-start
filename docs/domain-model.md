@@ -80,6 +80,8 @@ Every edit is followed by reconcile, so the invariants always hold. Positions co
 - Dropping an app onto a folder appends it. A folder cannot go into another folder.
 - "Remove from Folder" puts the app into the slot right after the folder. A folder left with one app dissolves into that app.
 - Moving several items to a page appends them to its end in reading order: page by page and slot by slot, with the apps of a folder in the folder's order. Apps leave their folders. A page one past the last adds as many pages at the end as the items fill. A page without room for all of them takes none.
+- Moving apps to a folder appends them to its end in reading order. Apps leave their slots and their folders; apps already in the folder keep their place in it. Nothing changes when every app is already there. The move only takes items off pages, so it never overfills one.
+- Pages carry no identity, and an edit drops the pages it empties, so the overlay finds its shown page again by an item that page kept: an app the edit did not take, or a folder that lost none of its apps. A page that kept nothing follows the nearest earlier page that did.
 - Making a folder of several apps puts it where the first of them is in reading order: in that app's slot, or right after the folder that holds it. It needs two or more placed apps. It is named after the first App Store category among them, else "Folder".
 - Removing several apps from a folder puts them into the slots right after it, in the folder's order. Apps elsewhere stay where they are.
 - Renaming trims surrounding whitespace; an empty name keeps the old one.

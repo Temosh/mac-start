@@ -23,7 +23,7 @@ It is a personal tool, run on the developer's own Mac. It is either built locall
 - Export the full layout to a file and import it back.
 - Keep the layout across restarts. Layout means pages, order, folders, and hidden apps.
 - Export everything (layout and all preferences) to one file, so moving to a new Mac is a single import.
-- Act on several items at once in edit mode: select them by click, `⇧`-click, `⌘A`, or a rectangle, then move, group, or hide them together.
+- Act on several items at once in edit mode: select them by click, `⇧`-click, `⌘A`, or a rectangle, then move them to a page or a folder, group, or hide them together.
 
 More features will follow. Each one is recorded here when it is agreed.
 
@@ -39,7 +39,7 @@ More features will follow. Each one is recorded here when it is agreed.
 
 1. **Open and launch:** press the hotkey, the overlay appears, click an app (or search and press Return), the app launches, and the overlay closes.
 2. **Search:** type while the overlay is open to filter apps by name. Hidden apps never appear in results.
-3. **Organize:** drag icons to reorder them, move them between pages, or put them on a new page past the last one. Drop one app onto another to create a folder. Rename folders. In edit mode, select several items and move, group, or hide them together.
+3. **Organize:** drag icons to reorder them, move them between pages, or put them on a new page past the last one. Drop one app onto another to create a folder. Rename folders. In edit mode, select several items and move them to a page or a folder, group, or hide them together.
 4. **Hide:** hide an app from the grid, and review or unhide hidden apps later.
 5. **Back up and migrate:** export the layout and all preferences to a JSON file, and import it on the same or another Mac.
 6. **Dismiss:** close the overlay with Escape, the hotkey, or a click on an empty area.

@@ -218,6 +218,56 @@ extension Layout {
         return trial.moveItems(ids, toPage: page, pageCapacity: pageCapacity)
     }
 
+    /// The folders in reading order.
+    public var foldersInReadingOrder: [Folder] {
+        pages.flatMap(\.items).compactMap { item in
+            if case .folder(let folder) = item {
+                return folder
+            }
+            return nil
+        }
+    }
+
+    /// Moves the given apps to the end of the folder with `id`, in reading order. Apps leave their slots or their
+    /// folders; apps already in the folder stay where they are in it. A folder left with one app dissolves into
+    /// it. Returns false, and changes nothing, when the folder is missing or none of the apps moves.
+    @discardableResult
+    public mutating func moveApps(_ apps: Set<AppID>, toFolder id: UUID, pageCapacity: Int) -> Bool {
+        guard
+            let position = position(ofFolder: id),
+            case .folder(let target) = pages[position.page].items[position.slot]
+        else {
+            return false
+        }
+        let moving = apps.subtracting(target.apps)
+        let ordered = pages.flatMap(\.items).flatMap(\.appIDs).filter(moving.contains)
+        guard !ordered.isEmpty else {
+            return false
+        }
+        var pages = self.pages
+        for pageIndex in pages.indices {
+            pages[pageIndex].items = pages[pageIndex].items.compactMap { item in
+                switch item {
+                case .app(let appID):
+                    return moving.contains(appID) ? nil : item
+                case .folder(var folder) where folder.id == id:
+                    folder.apps += ordered
+                    return .folder(folder)
+                case .folder(var folder):
+                    folder.apps.removeAll(where: moving.contains)
+                    return .folder(folder)
+                }
+            }
+        }
+        return apply(pages, pageCapacity: pageCapacity)
+    }
+
+    /// True when at least one of the apps can move into the folder.
+    public func canMoveApps(_ apps: Set<AppID>, toFolder id: UUID, pageCapacity: Int) -> Bool {
+        var trial = self
+        return trial.moveApps(apps, toFolder: id, pageCapacity: pageCapacity)
+    }
+
     /// Makes a folder of the given apps, in reading order, where the first of them is: in that app's slot, or right
     /// after the folder that holds it. `name` names the folder from its apps. Returns the folder's identifier, or
     /// nil, changing nothing, when fewer than 2 of the apps are placed or the page has no room for the folder.
@@ -264,6 +314,32 @@ extension Layout {
     public func canMakeFolder(of apps: Set<AppID>, pageCapacity: Int) -> Bool {
         var trial = self
         return trial.makeFolder(of: apps, named: { _ in "" }, pageCapacity: pageCapacity) != nil
+    }
+
+    /// Where page `page` of `previous` is in this layout, after an edit that took the items in `taken`. Pages carry
+    /// no identity, and an edit drops the pages it empties, so the page is found by an item it kept: an app that
+    /// was not taken, or a folder that lost none of its apps. A page that kept no item is placed right after the
+    /// nearest earlier page that did. The result is a valid page index.
+    public func index(ofPage page: Int, in previous: Layout, taking taken: Set<Item.ID>) -> Int {
+        let lastPage = max(pages.count - 1, 0)
+        guard previous.pages.indices.contains(page) else {
+            return min(max(page, 0), lastPage)
+        }
+        for candidate in stride(from: page, through: 0, by: -1) {
+            guard
+                let kept = previous.pages[candidate].items.first(where: { !Self.isTouched($0, by: taken) }),
+                let index = pages.firstIndex(where: { $0.items.contains { $0.id == kept.id } })
+            else {
+                continue
+            }
+            return min(index + (candidate == page ? 0 : 1), lastPage)
+        }
+        return min(page, lastPage)
+    }
+
+    /// True when an edit that takes `taken` moves the item or changes what it holds.
+    private static func isTouched(_ item: Item, by taken: Set<Item.ID>) -> Bool {
+        taken.contains(item.id) || item.appIDs.contains { taken.contains(.app($0)) }
     }
 
     /// Hides an app. Reconcile then takes it out of its slot or folder, because hidden wins over placement.

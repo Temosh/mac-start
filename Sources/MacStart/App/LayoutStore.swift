@@ -58,6 +58,11 @@ final class LayoutStore {
         return folder
     }
 
+    /// The folders for a Move to Folder menu, in reading order, without the folder with `excludedID`.
+    func folderChoices(excluding excludedID: UUID? = nil) -> [FolderChoice] {
+        FolderChoice.all(in: layout, excluding: excludedID) { app(for: $0)?.displayName }
+    }
+
     // MARK: - Editing
 
     /// Moves the item at `source` to `destination`. See `Layout.moveItem(from:to:pageCapacity:)`. Returns false
@@ -135,6 +140,15 @@ final class LayoutStore {
     func moveItems(_ ids: Set<Item.ID>, toPage page: Int) -> Bool {
         var isMoved = false
         edit { isMoved = $0.moveItems(ids, toPage: page, pageCapacity: preferences.pageCapacity) }
+        return isMoved
+    }
+
+    /// Moves apps to the end of a folder, in reading order. See `Layout.moveApps(_:toFolder:pageCapacity:)`.
+    /// Returns false when none of them moves.
+    @discardableResult
+    func moveApps(_ apps: Set<AppID>, toFolder id: UUID) -> Bool {
+        var isMoved = false
+        edit { isMoved = $0.moveApps(apps, toFolder: id, pageCapacity: preferences.pageCapacity) }
         return isMoved
     }
 

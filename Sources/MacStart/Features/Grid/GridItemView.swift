@@ -89,6 +89,7 @@ struct GridItemView: View {
                 SelectionMenuItems(
                     summary: selectionSummary,
                     pageCount: pageCount,
+                    folders: store.folderChoices(),
                     canPerform: actions.canPerformEdit,
                     perform: actions.performEdit
                 )
@@ -100,6 +101,7 @@ struct GridItemView: View {
                     actions.showInFinder(app)
                 }
                 moveToPageMenu
+                moveToFolderMenu(for: app.id)
                 if case .inFolder(let folderID, let index)? = location {
                     Button("Remove from Folder") {
                         actions.removeFromFolder(folderID, index)
@@ -120,6 +122,27 @@ struct GridItemView: View {
                 actions.moveItems([item.id], $0)
             }
         }
+    }
+
+    /// Moves just this app to the end of another folder. Shown only when there is another folder.
+    @ViewBuilder
+    private func moveToFolderMenu(for appID: AppID) -> some View {
+        let folders = store.folderChoices(excluding: currentFolderID)
+        if !folders.isEmpty {
+            Menu("Move to Folder") {
+                FolderMenuItems(folders: folders, canMove: { actions.canMoveAppsToFolder([appID], $0) }) {
+                    actions.moveAppsToFolder([appID], $0)
+                }
+            }
+        }
+    }
+
+    /// The folder that holds this tile, or nil for a tile on a page or in search results.
+    private var currentFolderID: UUID? {
+        if case .inFolder(let folderID, _)? = location {
+            return folderID
+        }
+        return nil
     }
 
     /// In edit mode, VoiceOver can select the tile directly, since activating a folder opens it.
@@ -161,6 +184,7 @@ struct GridItemView: View {
                 SelectionMenuItems(
                     summary: selectionSummary,
                     pageCount: pageCount,
+                    folders: store.folderChoices(),
                     canPerform: actions.canPerformEdit,
                     perform: actions.performEdit
                 )
