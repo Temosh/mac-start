@@ -83,7 +83,7 @@ These folders are the agreed layout. They are created as the code is written.
 | Layout storage | `~/Library/Application Support/MacStart/layout.json`, written atomically | Human-readable, and uses the same format as export |
 | Preferences | `Preferences` value in `MacStartCore`, stored in `UserDefaults` | Small settings, included in export |
 | Dock icon | `applicationShouldHandleReopen` toggles the overlay; `applicationDockMenu` adds Settings | Same entry point as Launchpad |
-| Launch at login | `SMAppService.mainApp`, toggled in Settings. Every launch makes the registration match the preference, which registers it on the first launch and again after an update | On by default; each ad hoc signed build has a new signature that can invalidate the old registration |
+| Launch at login | `SMAppService.mainApp`, toggled in Settings. Every launch makes the registration match the preference, which registers it on the first launch (the one with no saved preferences) and again after an update | On by default; each ad hoc signed build has a new signature that can invalidate the old registration |
 | Shortcut names | `UCKeyTranslate` with the current keyboard layout, plus symbols for special keys | Shows the key the user's layout types, like macOS menus do |
 
 ## Data Flow
@@ -109,4 +109,9 @@ Catalog changes from FSEvents trigger a rescan, then `LayoutStore` reconciles an
 ## Testing Strategy
 
 - Unit tests cover `MacStartCore`: reconcile invariants, duplicate collapsing, the export/import round trip, schema version rejection, and catalog scanning against temporary bundle fixtures. A seeded random test reconciles hundreds of random layouts and checks every invariant.
-- The overlay, hotkey, and launching are verified manually by building and running the app. UI automation is out of scope for now.
+- The overlay, hotkey, input, and settings are checked by hand by the developer, in the built app with the display awake. UI automation is out of scope for now. How agents take part in these checks: `.agents/rules/workflow.md`.
+- Manual checks, by area:
+  - Overlay: Option-S and the Dock icon toggle it over the whole main display, including the menu bar and the Dock, also over a full-screen app. A click on an app launches it. A click between icons, Escape, switching apps, or switching Spaces closes it, and the previous app gets the focus back. A two-finger swipe, a mouse wheel, the arrow keys at the page edge, and the page dots change pages.
+  - Search and keyboard: typing filters at once, the best match comes first, and Return launches it. The arrow keys move through the results and the grid. Escape clears the search before it closes the overlay. Hidden apps never show up. Apps that share a name show their version. VoiceOver reads names and the selection, and Increase Contrast adds outlines and stronger dimming.
+  - Organizing: a drag shifts the other icons live, and the drop lands in the gap, also on another page after resting at a screen edge. Resting on an app makes a folder named after its category; resting on a folder adds to it. A folder opens on a click, renames in place, and closes with a click outside or Escape. A drag inside a folder reorders it, and a drag out places the app in the grid. A click launches; a drag never does.
+  - Settings: `⌘,` and the Dock icon's menu open it and close the overlay. The shortcut recorder takes a new shortcut, which still works after a restart; Escape cancels, and a plain letter is refused. Open at login adds and removes the login item. Picking a grid size asks to confirm and then reflows the pages. Hide and Unhide work, with search and multiple selection. Export writes a file; Import asks to confirm and restores it; a file that is not a backup shows an alert.

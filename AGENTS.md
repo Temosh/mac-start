@@ -101,6 +101,7 @@ Use only the rules that apply to the current task:
 | `.agents/rules/documentation-and-diagrams.md` | Documentation conventions and mandatory Mermaid diagram rules |
 | `.agents/rules/code-conventions.md` | Language-agnostic code conventions |
 | `.agents/rules/code-conventions-swift-macos.md` | Swift desktop macOS app conventions |
+| `.agents/rules/workflow.md` | Commits, checks by the developer, the developer's focus, and assets |
 
 ## Source Layout
 
