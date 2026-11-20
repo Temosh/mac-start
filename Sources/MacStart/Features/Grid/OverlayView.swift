@@ -285,10 +285,10 @@ struct OverlayView: View {
                     icons: icons,
                     actions: actions
                 )
+                .modifier(zoom.appearance(isClosing: isClosing))
                 .id(folderID)
-                .modifier(zoom.effect(isCollapsed: isClosing))
                 .allowsHitTesting(state.isFolderSettled)
-                .transition(AsymmetricTransition(insertion: zoom, removal: IdentityTransition()))
+                .transition(.identity)
             }
         }
         .animation(

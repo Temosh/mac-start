@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// The open folder's panel grows out of the folder's icon, as in Launchpad. A folder that is not on the shown page has
-/// no icon to grow from, so its panel grows a little from where it stands. A closing panel shrinks with `effect`.
-struct FolderZoom: Transition {
+/// The open folder's panel grows out of the folder's icon, as in Launchpad, and shrinks back into it when the folder
+/// closes. A folder that is not on the shown page has no icon to grow from, so its panel grows a little from where it
+/// stands.
+@MainActor
+struct FolderZoom {
     /// The center of the folder's icon, in overlay coordinates, or nil when the icon is not on the shown page.
     let iconCenter: CGPoint?
     let iconSize: CGFloat
@@ -10,24 +12,51 @@ struct FolderZoom: Transition {
     let panel: CGRect
     let overlaySize: CGSize
 
-    func body(content: Content, phase: TransitionPhase) -> some View {
-        content.modifier(effect(isCollapsed: !phase.isIdentity))
+    /// Zooms the panel in as it appears, and out once `isClosing`.
+    func appearance(isClosing: Bool) -> Appearance {
+        Appearance(zoom: self, isClosing: isClosing)
     }
 
-    /// The panel shrunk into the icon, or at full size. A closing panel uses it to shrink while it stays in place.
-    func effect(isCollapsed: Bool) -> Effect {
-        Effect(zoom: self, isCollapsed: isCollapsed)
-    }
-
-    struct Effect: ViewModifier {
+    /// Starts the panel shrunk into the icon and zooms it in once it appears. Both zooms run in this one modifier,
+    /// so the views inside always know when the panel is zooming: a transition does not tell them.
+    struct Appearance: ViewModifier {
         let zoom: FolderZoom
-        let isCollapsed: Bool
+        let isClosing: Bool
+
+        @State private var hasAppeared = false
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         func body(content: Content) -> some View {
             content
-                .scaleEffect(isCollapsed ? zoom.collapsedScale : 1, anchor: zoom.panelCenter)
-                .offset(isCollapsed ? zoom.collapsedOffset : .zero)
-                .opacity(isCollapsed ? 0 : 1)
+                .modifier(Effect(zoom: zoom, progress: hasAppeared && !isClosing ? 1 : 0))
+                .onAppear {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: OverlayState.folderZoomDuration)) {
+                        hasAppeared = true
+                    }
+                }
+        }
+    }
+
+    /// The panel `progress` of the way from shrunk into the icon and clear, at 0, to full size, at 1. In between, it
+    /// tells the views inside that the panel is zooming, from the first frame of a zoom to its last.
+    struct Effect: ViewModifier, Animatable {
+        let zoom: FolderZoom
+        nonisolated var progress: CGFloat
+
+        nonisolated var animatableData: CGFloat {
+            get { progress }
+            set { progress = newValue }
+        }
+
+        func body(content: Content) -> some View {
+            content
+                .environment(\.isFolderZooming, progress < 1)
+                .scaleEffect(zoom.collapsedScale + (1 - zoom.collapsedScale) * progress, anchor: zoom.panelCenter)
+                .offset(
+                    x: zoom.collapsedOffset.width * (1 - progress),
+                    y: zoom.collapsedOffset.height * (1 - progress)
+                )
+                .opacity(progress)
         }
     }
 
@@ -51,4 +80,9 @@ struct FolderZoom: Transition {
         }
         return CGSize(width: iconCenter.x - panel.midX, height: iconCenter.y - panel.midY)
     }
+}
+
+extension EnvironmentValues {
+    /// True while the open folder's panel grows or shrinks.
+    @Entry var isFolderZooming = false
 }

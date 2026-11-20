@@ -35,9 +35,15 @@ Measured on 2026-11-19: macOS 27.2.1, a 3024×1964 Retina main display, a 7×5 g
 6. **The folder zoom leaks the same way as finding 2.** `FolderZoom` scales the panel, with its name field and app labels, from icon size to full size.
    - Cost, with fixes 2–4 in place: 0.48 MB of live heap and about 160 ms of CPU per open+close of a 4-app folder.
    - Isolated: without the panel scale, live heap is flat. The animated 8 pt backdrop blur does not leak; it costs about 20 ms of CPU per open+close.
-   - The fix changes how the panel looks while it opens. Per the workflow rules, render the options side by side first:
-     - A: only the glass shape grows out of the icon, and the name and apps fade in at full size.
-     - B: the whole panel zooms through Core Animation in its own layer. It looks the same as today, but the edit bar and the dragged tile must stay above it.
+   - Options, rendered side by side on 2026-11-19 (see Notes): A, the glass grows and the content fades in; B, today's look through Core Animation in its own hosting view, which would take the drag gesture's mouse events; C, today's look with an image of the name and apps zooming in their place; and a plain fade for reference. The developer picked C.
+   - Fix, done: one animatable modifier, `FolderZoom.Effect`, zooms the panel in from `onAppear` and out when it closes. It sets `isFolderZooming` in the environment while the zoom runs, from its first frame to its last. While it is set, `FolderPanelView` shows an image of the name and apps that one shared `ImageRenderer` draws once per zoom; the glass stays live. The swap needs these details:
+     - A transition does not pass its environment to the views inside, so the open zoom ran with the live views until the zoom moved into the modifier.
+     - A fixed 0.2 s timer swapped back a frame or two early, drawing the live text once at a scale such as 0.998.
+     - Each new `ImageRenderer` kept about 1 MB of graphics memory, so one renderer serves every zoom, which holds about 1.3 MB.
+     - `ImageRenderer.render(rasterizationScale:)` into a context of its own left the image a device pixel off. `cgImage` places layers on whole pixels as the window does.
+     - The image covers the panel's frame grown to whole pixels.
+     - `drawingGroup` was rejected: footprint 88 → 273 MB over 50 opens, and the glyphs still grew.
+   - Results: `harness.sh folders 100` keeps the footprint at 71.6–71.8 MB with live heap flat at 25.0–25.3 MB, at 107–130 ms of CPU per open+close. The image and the live views at rest differ only in antialiasing: best shift 0 px, mean channel difference 0.41.
 7. **Smaller cases of the same cause, not measured.** These are animated scales over text or SF Symbols: a folder drop target grows its whole tile to 1.15, and the hover raise scales the edit badge's `checkmark` symbol in edit mode. Each should add only one tile's glyphs per event to the same capped cache.
 8. **SwiftUI's context menu has a retain cycle.** `ContextMenuResponder` and `ContextMenuResponder.AppKitMenuDelegate` keep each other alive, about 20 KB per context menu shown. It is a framework bug, and no fix is planned.
 
@@ -65,14 +71,15 @@ Done, waiting for the developer's check by hand:
 - `IconProvider`: IOSurface-backed bitmaps, and a prune in every prewarm.
 - `CatalogScanner`: a depth cap of 5 levels, with a fixture test for 5 and 6 levels.
 - `CatalogWatcher`: rescans only for the paths that `CatalogChangeFilter` in `MacStartCore` lets through. The filter has unit tests.
-- Docs: `docs/architecture.md` (the show and hide animation, app discovery, icons, source layout, testing) and `docs/domain-model.md` (the catalog scan).
+- `FolderZoom`, `FolderPanelView`, `GridItemView` (`tileContrast`), `OverlayView`, and the new `SurfaceImage`: option C for the folder zoom (finding 6).
+- Docs: `docs/architecture.md` (the show and hide animation, the folder zoom, app discovery, icons, source layout, testing) and `docs/domain-model.md` (the catalog scan).
 
-Left, after the developer picks an option: the folder zoom (finding 6) and the smaller cases (finding 7).
+Left: the smaller cases (finding 7). They are hover and drag animations, so each change goes to the developer as its own build.
 
 ## Acceptance Criteria
 
 - `harness.sh controller 200`: the footprint stays within 2 MB of its value after the warm-up, and live heap does not grow.
-- `harness.sh folders 100`, once finding 6 is done: live heap does not grow.
+- `harness.sh folders 100`: live heap does not grow.
 - A rescan costs under 30 ms of CPU, and an FSEvents path inside a bundle below `Contents/` triggers no rescan.
 - The developer sees the same zoom and fade as before, and the same icons.
 
@@ -92,6 +99,6 @@ Left, after the developer picks an option: the folder zoom (finding 6) and the s
   - `zoom`: the zoom is centered (1.06, offset −54, −35.07 on an 1800×1169 pt display), runs through 1.042 mid-hide, and ends at identity after SwiftUI updates.
   - `watch`: a write inside a bundle's `Resources` reports no change, and a new app reports one.
   - `rescan`: a rescan costs 27–32 ms of CPU.
-  - Not covered by the harness: the folder zoom still leaks (finding 6).
+- Folder zoom renders (2026-11-19): a scratch copy of `Sources/` showed the overlay off-screen, and `cacheDisplay` took two snapshots, the overlay with the folder closed and the open folder's name and apps alone. Each frame was then composed with the app's zoom geometry and its 0.2 s ease-out, with the grid blur, the dimming, and the glass redrawn in CoreImage, because snapshots draw no blurs or materials. The renders are a filmstrip and a GIF slowed 4×. They show the developer's own apps, so they stay out of the repository. The "today" row scales a full-size image of the name and apps, which is exactly what C does.
 - FSEvents can deliver changes made just before a stream starts, and it names a root reached through a symbolic link by its real path. `CatalogChangeFilter` knows each root by both paths, and it uses `realpath`, because `URL.resolvingSymlinksInPath()` drops the `/private` in front of `/var`.
 - Running app when this note was written: PID 2301, 0.0% CPU at hold, 14.1 s CPU in 50 minutes, 138 MB footprint. Of that: Malloc Small 70 MB (33 MB live), CoreAnimation 23 MB, CG Raster Data 21 MB.

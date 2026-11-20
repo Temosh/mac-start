@@ -43,6 +43,11 @@ final class LayoutStore {
         catalog[id]
     }
 
+    /// The line under an app's name: its version when other apps share the name, so they can be told apart.
+    func subtitle(for app: InstalledApp) -> String? {
+        sharedDisplayNames.contains(app.displayName) ? app.version : nil
+    }
+
     /// Search results for the overlay: at most one page of the best matches.
     func searchResults(matching query: String) -> [InstalledApp] {
         Array(layout.searchResults(matching: query, in: catalog).prefix(preferences.pageCapacity))

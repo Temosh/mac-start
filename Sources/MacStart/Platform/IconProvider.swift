@@ -1,14 +1,12 @@
 import AppKit
-import CoreVideo
 import MacStartCore
-import VideoToolbox
 
 /// App icons from `NSWorkspace`, drawn at the size they show at and cached in memory. A pre-sized bitmap keeps
 /// paging and dragging smooth, because the grid never scales a large icon while it moves. `prewarm(_:)` draws
 /// icons in the background ahead of time, so opening the overlay does not draw them either.
 ///
-/// Each bitmap lives in an IOSurface, which Core Animation shows as it is. From ordinary memory, Core Animation
-/// keeps its own copy of every image it shows, as long as the image lives: about 21 MB more for a 95-icon grid.
+/// Each bitmap is a `SurfaceImage`, which Core Animation shows without a copy of its own: about 21 MB less for a
+/// 95-icon grid.
 @MainActor
 final class IconProvider {
     private var cache: [IconKey: NSImage] = [:]
@@ -86,66 +84,13 @@ final class IconProvider {
     private nonisolated static func render(_ job: IconJob) -> CGImage? {
         let source = NSWorkspace.shared.icon(forFile: job.path)
         var proposedRect = CGRect(x: 0, y: 0, width: job.pixels, height: job.pixels)
-        guard
-            let image = source.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil),
-            let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
-            let buffer = makeSurfaceBuffer(side: job.pixels, colorSpace: colorSpace),
-            draw(image, into: buffer, side: job.pixels, colorSpace: colorSpace)
-        else {
+        guard let image = source.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
             return nil
         }
-        var surfaceImage: CGImage?
-        guard VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &surfaceImage) == noErr else {
-            return nil
+        return SurfaceImage.make(width: job.pixels, height: job.pixels) { context in
+            context.interpolationQuality = .high
+            context.draw(image, in: CGRect(x: 0, y: 0, width: job.pixels, height: job.pixels))
         }
-        return surfaceImage
-    }
-
-    /// A square pixel buffer backed by an IOSurface, in the BGRA layout Core Animation shows directly.
-    private nonisolated static func makeSurfaceBuffer(side: Int, colorSpace: CGColorSpace) -> CVPixelBuffer? {
-        let attributes: [CFString: Any] = [
-            kCVPixelBufferIOSurfacePropertiesKey: [CFString: Any]() as CFDictionary,
-            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
-        ]
-        var buffer: CVPixelBuffer?
-        guard
-            CVPixelBufferCreate(nil, side, side, kCVPixelFormatType_32BGRA, attributes as CFDictionary, &buffer)
-                == kCVReturnSuccess,
-            let buffer
-        else {
-            return nil
-        }
-        CVBufferSetAttachment(buffer, kCVImageBufferCGColorSpaceKey, colorSpace, .shouldPropagate)
-        return buffer
-    }
-
-    /// Draws `image` to fill the buffer. Returns false when the buffer cannot be drawn into.
-    private nonisolated static func draw(
-        _ image: CGImage,
-        into buffer: CVPixelBuffer,
-        side: Int,
-        colorSpace: CGColorSpace
-    ) -> Bool {
-        CVPixelBufferLockBaseAddress(buffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-        guard
-            let context = CGContext(
-                data: CVPixelBufferGetBaseAddress(buffer),
-                width: side,
-                height: side,
-                bitsPerComponent: 8,
-                bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-            )
-        else {
-            return false
-        }
-        let bounds = CGRect(x: 0, y: 0, width: side, height: side)
-        context.clear(bounds)
-        context.interpolationQuality = .high
-        context.draw(image, in: bounds)
-        return true
     }
 }
 

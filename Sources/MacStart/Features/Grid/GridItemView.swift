@@ -62,8 +62,7 @@ struct GridItemView: View {
     }
 
     private func appTile(_ app: InstalledApp) -> some View {
-        // Apps that share a name show their version, so they can be told apart.
-        let subtitle = store.sharedDisplayNames.contains(app.displayName) ? app.version : nil
+        let subtitle = store.subtitle(for: app)
         return Button {
             actions.click(item)
         } label: {
@@ -215,6 +214,7 @@ struct TileLabel<Icon: View>: View {
     let icon: Icon
 
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.tileContrast) private var contrastOverride
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// How much a raised icon grows: as much as a dragged tile, so picking up a raised icon does not change its size.
@@ -243,7 +243,7 @@ struct TileLabel<Icon: View>: View {
     }
 
     var body: some View {
-        let isHighContrast = contrast == .increased
+        let isHighContrast = (contrastOverride ?? contrast) == .increased
         VStack(spacing: style.labelSpacing) {
             icon
                 .frame(width: style.iconSize, height: style.iconSize)
@@ -304,6 +304,12 @@ struct TileLabel<Icon: View>: View {
         }
         return nil
     }
+}
+
+extension EnvironmentValues {
+    /// The contrast a tile draws with when it is drawn apart from the window, as in the image of an open folder's
+    /// apps, whose renderer does not know the window's contrast. Nil uses the environment's own.
+    @Entry var tileContrast: ColorSchemeContrast? = nil
 }
 
 /// Darkens a tile while it is pressed.

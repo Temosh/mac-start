@@ -43,7 +43,7 @@ Sources/
       Settings/            Settings window panes: shortcut, launch at login, grid size, Reset Layout,
                            hidden apps, backup
     Platform/              Thin adapters: GlobalHotKey, CatalogWatcher, IconProvider,
-                           AppLauncher, LoginItem, KeyNames
+                           SurfaceImage, AppLauncher, LoginItem, KeyNames
 Tests/
   MacStartCoreTests/       Swift Testing; reconcile, editing, search, navigation, codec, catalog scan fixtures
 Support/
@@ -77,6 +77,7 @@ This is the layout as built.
 | Keyboard | A local key monitor takes the arrow keys, Return, and Escape before the focused search field; every other key goes to the field | Typing searches at once, while the grid stays keyboard driven |
 | Drag and drop | One SwiftUI drag gesture for the whole overlay, with a coordinator that finds the tile whose cell holds the press; not system drag and drop, so icons make room live. Tiles carry no gestures, so a folder panel closes as soon as a drag leaves it. A full page opens no gap, so a drop never pushes icons to the next page (see the editing rules in [domain-model.md](domain-model.md#editing)) | Launchpad-like reflow, folder creation by resting on an icon, and page turns at the screen edges |
 | Show and hide animation | The content view's layer fades, and the SwiftUI content zooms from 1.06 through its layer's `sublayerTransform`, each with an explicit Core Animation animation after its final value is set | `NSWindow.animator()` alpha can stall at its start value, for example while the display sleeps, which would leave an invisible overlay. A SwiftUI scale redrew every label at each frame's size, and CoreGraphics keeps the glyphs of every size it draws: about 0.3 MB and 0.14 s of CPU per show and hide |
+| Folder zoom | One animatable modifier zooms the open folder's panel in and out and tells the views inside while it zooms. Meanwhile an image of the folder's name and apps zooms in their place, drawn once per zoom by one shared `ImageRenderer`, which places layers on whole pixels as the window does | A SwiftUI zoom of the live views redrew their text at each frame's size, and CoreGraphics keeps the glyphs of every size it draws: about 0.5 MB per open and close. A transition does not tell the views inside that it runs. Each new `ImageRenderer` keeps about 1 MB of graphics memory, and drawing into a context of its own puts the image up to a pixel off |
 | Target display | `NSScreen.screens.first`, the display that holds the menu bar | `NSScreen.main` follows keyboard focus, which is not the main display |
 | Background | `NSVisualEffectView` blur behind the grid | Native look like Launchpad |
 | App discovery | Scan `/Applications`, `/System/Applications`, `~/Applications` up to five levels deep (never into `.app` bundles), plus FSEvents watching on those roots, debounced by a 2-second FSEvents latency. A change inside a bundle, below its `Contents` folder, or below the scan depth starts no rescan | One code path handles the full scan and later updates, which keeps the list free of duplicates. FSEvents reports every write inside a bundle, such as an install in progress, and a scan of every folder took 0.4 s with one Unity install |
