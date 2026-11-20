@@ -49,6 +49,7 @@ Tests/
 - Use `@Environment` for cross-cutting UI dependencies such as scene phase, dismiss actions, color scheme, and injected app services.
 - Avoid doing network, file, or persistence work directly in `body`.
 - Use `.task` for view-scoped async loading when cancellation should follow view lifecycle.
+- Zoom a large view tree, such as a whole window or a panel of labels, with Core Animation or through an image of it, not with an animated `scaleEffect`. SwiftUI redraws its text at each frame's size, and CoreGraphics keeps the glyphs of every size it draws: in MacStart, up to about 55 MB and 0.14 s of CPU per zoom. A single tile growing on hover or as a drop target measured leak-free.
 
 ## AppKit
 

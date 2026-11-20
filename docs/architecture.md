@@ -109,6 +109,18 @@ sequenceDiagram
 
 Catalog changes from FSEvents trigger a rescan, then `LayoutStore` reconciles and saves. All layout mutations go through `LayoutStore` on the main actor. Scanning and file I/O run off the main actor.
 
+## Footprint
+
+MacStart runs from login to logout, so it must cost nothing at hold and must not grow with use.
+
+- At hold there are no timers, display links, or polling: 0% CPU, no wakeups, and about 65 MB, measured with 95 tiles and 115 apps on macOS 27.2. Opening the overlay or a folder, however often, must leave it there.
+- To check the running app, which needs no debugger, use `footprint <pid>`, `vmmap --summary <pid>`, and `top -l 2 -s 15 -pid <pid> -stats pid,cpu,idlew,mem`. Read them right after launch and after a day of use.
+- To measure the overlay without the developer's display, run a copy of `Sources/` whose panel is ordered in 40,000 pt off every display, never key, in a process with the `.prohibited` activation policy. With `MallocStackLogging=1`, `heap` then names what grows. Snapshots from `cacheDisplay` draw no blurs or materials.
+- Large view trees zoom in Core Animation or through an image of them; see [the SwiftUI conventions](../.agents/rules/code-conventions-swift-macos.md#swiftui), and the show and hide animation and folder zoom rows above.
+- The overlay's views stay built while it is hidden. Releasing them saved no footprint, because the freed memory stays dirty in malloc, and each show then took about 60 ms instead of 18 ms.
+- No zoom uses `drawingGroup`: over 50 folder opens it grew the footprint from 88 to 273 MB, and the glyphs still grew.
+- Each SwiftUI context menu that is shown keeps about 20 KB, because `ContextMenuResponder` and its `AppKitMenuDelegate` keep each other alive. It is a framework bug, accepted.
+
 ## Testing Strategy
 
 - Unit tests cover `MacStartCore`: reconcile invariants, duplicate collapsing, the export/import round trip, schema version rejection, catalog scanning against temporary bundle fixtures, and which FSEvents paths start a rescan. A seeded random test reconciles hundreds of random layouts and checks every invariant.
