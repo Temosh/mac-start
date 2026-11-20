@@ -5,7 +5,7 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 ## Overlay
 
 - It covers the whole main display (`NSScreen.screens.first`), including the menu bar and Dock areas.
-- It appears on the current Space, even over fullscreen apps.
+- It appears on the current Space, even over fullscreen apps, and stays on that Space. A Space switch slides it away with the old Space, so each Space shows only its own desktop.
 - The background is a blurred view of the desktop.
 - Showing and hiding use a short fade and scale animation. When Reduce Motion is on, it switches with no animation.
 - Opening the app from Finder, or from the Dock while it is not running, shows the overlay. A launch at login keeps it hidden until the hotkey or the Dock icon opens it.
@@ -53,7 +53,7 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 | Edit action bar | Shows above the page dots in edit mode, with the selection count. The folder actions come first, side by side: New Folder, and Remove from Folder inside an open folder. New Folder groups the selected apps where the first of them is; it needs two or more apps and no folders. Move to is one menu with a Pages section and a Folders section, so the bar keeps one control per kind of action. A page takes the selected items at its end, and New Page makes a page for them. A folder takes the selected apps at its end; folders are unavailable while the selection holds a folder, and a folder that already holds every selected app is unavailable. Hide works on apps only, and has no `⌘⌫` shortcut: the search field has the focus, where `⌘⌫` deletes text, and a slip would hide many apps with no undo. Deselect All clears the selection. The bar has no Show in Finder, which for a large selection would open one Finder window per app; a single app's menu keeps it. Inside an open folder, Remove from Folder puts the folder's selected apps right after it. New Folder and Remove from Folder are unavailable when their result would not fit its page |
 | Done | Leaves edit mode |
 | `⌘,` | Opens Settings, also while the overlay is open |
-| Losing focus (app switch, Space change) | Closes the overlay |
+| Losing focus (app switch, Space change) | Closes the overlay. After a Space change, the new Space keeps its own focus: the previous app does not get it back, because activating it would switch back to the old Space |
 
 ## Settings Window
 

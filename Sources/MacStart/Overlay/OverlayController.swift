@@ -31,7 +31,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
     /// The two-finger swipe in progress.
     private var swipe: PageSwipeTracking?
     /// The last app other than MacStart that was active. It gets the focus back when the overlay closes while
-    /// MacStart is active, for example after a click on the Dock icon.
+    /// MacStart is active, for example after a click on the Dock icon, unless the user left the overlay's Space.
     private var previousApp: NSRunningApplication?
     private let logger = LogArea.overlay.logger
 
@@ -92,7 +92,7 @@ final class OverlayController: NSObject, NSWindowDelegate {
             panel.contentView?.alphaValue = 0
             setContentZoom(isZoomedOut: true)
         }
-        panel.makeKeyAndOrderFront(nil)
+        panel.makeKeyAndOrderFrontOnActiveSpace()
         state.isPresented = true
         animateContent(toVisible: true)
         installEventMonitors()
@@ -130,10 +130,13 @@ final class OverlayController: NSObject, NSWindowDelegate {
         guard generation == visibilityGeneration else {
             return
         }
+        // Read before the panel goes out. Once the user has left the overlay's Space, the previous app can be on that
+        // Space, and activating it would switch them back there.
+        let isOnActiveSpace = panel.isOnActiveSpace
         panel.orderOut(nil)
         state.reset()
         logger.debug("Overlay ordered out")
-        if restoringFocus, NSApp.isActive {
+        if restoringFocus, isOnActiveSpace, NSApp.isActive {
             previousApp?.activate()
         }
     }
@@ -872,9 +875,11 @@ final class OverlayController: NSObject, NSWindowDelegate {
         hide()
     }
 
+    /// The overlay stays on the Space it opened on, so a Space change leaves it behind. It closes there, and the new
+    /// Space keeps its own focus.
     @objc private func activeSpaceDidChange() {
         logger.debug("Active Space changed")
-        hide()
+        hide(restoringFocus: false)
     }
 
     @objc private func applicationDidActivate(_ notification: Notification) {

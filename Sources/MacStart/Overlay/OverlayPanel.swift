@@ -3,9 +3,13 @@ import SwiftUI
 
 /// The borderless full-screen panel that hosts the overlay.
 ///
-/// It covers the menu bar and the Dock, appears on the active Space and over full-screen apps, and takes keyboard
-/// focus without activating MacStart, so the app the user was in stays active underneath.
+/// It covers the menu bar and the Dock, opens on the active Space, also over a full-screen app, and stays on that
+/// Space. It takes keyboard focus without activating MacStart, so the app the user was in stays active underneath.
 final class OverlayPanel: NSPanel {
+    /// Shown with full-screen apps, left out of the window cycle, and on one Space only, so the panel never follows
+    /// the user to another Space.
+    private static let oneSpaceBehavior: NSWindow.CollectionBehavior = [.fullScreenAuxiliary, .ignoresCycle]
+
     /// Handles a key press. Returns true when the key was used.
     var onKeyDown: ((NSEvent) -> Bool)?
     /// The SwiftUI content above the blur, which the controller zooms with Core Animation as the overlay shows and
@@ -21,7 +25,7 @@ final class OverlayPanel: NSPanel {
         )
         // Above the menu bar and the Dock, below pop-up menus, so context menus still appear on top.
         level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        collectionBehavior = Self.oneSpaceBehavior
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
@@ -52,6 +56,21 @@ final class OverlayPanel: NSPanel {
         hostingView.autoresizingMask = [.width, .height]
         blur.addSubview(hostingView)
         self.hostingView = hostingView
+    }
+
+    /// Orders the panel in as the key window on the active Space and keeps it there. Kept on every Space, it also
+    /// showed on the new Space during a Space switch, over the wrong wallpaper.
+    ///
+    /// It orders in while joining every Space, the setup that shows it over full-screen apps, and leaves the other
+    /// Spaces right after. Only ordering in moves it to the active Space, so a panel still fading out on a Space the
+    /// user left goes out first; otherwise it would stay on that Space.
+    func makeKeyAndOrderFrontOnActiveSpace() {
+        if isVisible, !isOnActiveSpace {
+            orderOut(nil)
+        }
+        collectionBehavior = Self.oneSpaceBehavior.union(.canJoinAllSpaces)
+        makeKeyAndOrderFront(nil)
+        collectionBehavior = Self.oneSpaceBehavior
     }
 
     override var canBecomeKey: Bool {
