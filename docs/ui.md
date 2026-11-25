@@ -16,7 +16,7 @@ MacStart has one main surface, the fullscreen overlay, plus a settings window. T
 - The paged grid fills the middle. Each item shows the app icon with its name below, truncated with an ellipsis. Apps that share a name also show their version below it.
 - Page indicator dots sit at the bottom. Clicking a dot jumps to that page.
 - The keyboard selection and the edit selection highlight a box 90% of the cell wide, so neighboring highlights never touch. In edit mode a selected item also shows a checkmark badge, so selection never relies on color alone.
-- The default grid is 7 columns by 5 rows. Settings offers 5 to 9 columns and 4 to 6 rows.
+- The default grid is 7 columns by 5 rows. Settings offers nine sizes: 5 to 7 columns with 4 rows, 6 to 8 with 5, and 7 to 9 with 6. The other combinations made tiles too sparse or too crowded.
 
 ## Interactions
 
@@ -65,7 +65,7 @@ As Apple's guidelines ask for macOS settings, a toolbar with one button per pane
   - **Shortcut** (default `⌥S`): click the recorder, then press the new shortcut; Escape cancels. A shortcut needs Command, Option, or Control, unless it is a function key. When another app already owns it, a message says so and the old shortcut stays.
   - **Open at login** (on by default). When macOS needs the user to allow it, a message and an Open Login Items button appear.
 - **Layout**
-  - **Grid size**: one pop-up with every size from 5 × 4 to 9 × 6 (columns × rows), grouped by rows; default 7 × 5. Picking a size asks to confirm first, because apps keep their order but shift into the new rows and columns, and a smaller grid moves the apps that no longer fit onto the next pages. Cancel keeps the old size.
+  - **Grid size**: one pop-up with the nine allowed sizes (columns × rows), grouped by rows; default 7 × 5. Picking a size asks to confirm first, because apps keep their order but shift into the new rows and columns, and a smaller grid moves the apps that no longer fit onto the next pages. Cancel keeps the old size.
   - **Reset Layout…** asks to confirm, then puts every installed app back in name order, as on the first launch, with no folders and no hidden apps. Settings stay. It cannot be undone; export a backup first to keep the old layout.
 - **Hidden Apps**: a search field, the hidden apps by name in a list where `⌘`-click and `⇧`-click select several, and one Unhide button for the selection. The list scrolls, so hundreds of apps fit in a pane of fixed size. A search keeps only matching apps selected. Unhidden apps go to the end of the last page. Uninstalled hidden apps show "Not installed". Without hidden apps, the pane says how to hide one.
 - **Backup**: Export and Import buttons with the standard save and open panels. An export covers the layout and every preference, named `MacStart Backup YYYY-MM-DD.json`. An import asks to confirm before it replaces anything.

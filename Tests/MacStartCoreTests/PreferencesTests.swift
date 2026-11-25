@@ -14,29 +14,47 @@ struct PreferencesTests {
         #expect(preferences.pageCapacity == 35)
     }
 
-    @Test func gridSizeStaysWithinTheAllowedRanges() {
-        var preferences = Preferences(hotKey: .default, gridColumns: 99, gridRows: 0, launchAtLogin: true)
-        #expect(preferences.gridColumns == Preferences.allowedGridColumns.upperBound)
-        #expect(preferences.gridRows == Preferences.allowedGridRows.lowerBound)
-
-        preferences.gridColumns = 1
-        preferences.gridRows = 50
-        #expect(preferences.gridColumns == Preferences.allowedGridColumns.lowerBound)
-        #expect(preferences.gridRows == Preferences.allowedGridRows.upperBound)
+    @Test func settingsOffersNineGridSizes() {
+        #expect(
+            Preferences.allowedGridSizes.map(\.text) == [
+                "5 × 4", "6 × 4", "7 × 4", "6 × 5", "7 × 5", "8 × 5", "7 × 6", "8 × 6", "9 × 6",
+            ]
+        )
     }
 
-    @Test func readingClampsAGridSizeOutsideTheAllowedRanges() throws {
+    @Test func aGridSizeThatIsNotAllowedBecomesTheNearestAllowedOne() {
+        var preferences = Preferences(hotKey: .default, gridColumns: 99, gridRows: 0, launchAtLogin: true)
+        #expect(preferences.gridSize == GridSize(columns: 7, rows: 4))
+
+        preferences.gridSize = GridSize(columns: 1, rows: 50)
+        #expect(preferences.gridSize == GridSize(columns: 7, rows: 6))
+
+        preferences.gridSize = GridSize(columns: 9, rows: 5)
+        #expect(preferences.gridSize == GridSize(columns: 8, rows: 5))
+
+        preferences.gridSize = GridSize(columns: 5, rows: 6)
+        #expect(preferences.gridSize == GridSize(columns: 7, rows: 6))
+    }
+
+    @Test func changingColumnsAndRowsTogetherKeepsBoth() {
+        var preferences = Preferences(hotKey: .default, gridColumns: 5, gridRows: 4, launchAtLogin: true)
+
+        preferences.gridSize = GridSize(columns: 9, rows: 6)
+
+        #expect(preferences.gridSize == GridSize(columns: 9, rows: 6))
+    }
+
+    @Test func readingMovesAGridSizeThatIsNotAllowedToTheNearestAllowedOne() throws {
         let saved = Preferences(hotKey: .default, gridColumns: 7, gridRows: 5, launchAtLogin: true)
         var json = try #require(
             try JSONSerialization.jsonObject(with: JSONEncoder().encode(saved)) as? [String: Any]
         )
-        json["gridColumns"] = 12
-        json["gridRows"] = 2
+        json["gridColumns"] = 9
+        json["gridRows"] = 4
 
         let read = try JSONDecoder().decode(Preferences.self, from: JSONSerialization.data(withJSONObject: json))
 
-        #expect(read.gridColumns == Preferences.allowedGridColumns.upperBound)
-        #expect(read.gridRows == Preferences.allowedGridRows.lowerBound)
+        #expect(read.gridSize == GridSize(columns: 7, rows: 4))
         #expect(read.hotKey == saved.hotKey)
     }
 
@@ -49,7 +67,7 @@ struct PreferencesTests {
         let preferences = Preferences(
             hotKey: HotKey(keyCode: 49, modifiers: [.command, .shift]),
             gridColumns: 9,
-            gridRows: 4,
+            gridRows: 6,
             launchAtLogin: false
         )
 

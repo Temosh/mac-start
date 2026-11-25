@@ -111,7 +111,7 @@ final class SettingsModel {
     // MARK: - Grid
 
     var gridSize: GridSize {
-        GridSize(columns: store.preferences.gridColumns, rows: store.preferences.gridRows)
+        store.preferences.gridSize
     }
 
     /// Asks to confirm, then changes the grid size, because the change moves apps the user arranged. Called from
@@ -125,8 +125,7 @@ final class SettingsModel {
                 return
             }
             self.store.updatePreferences { preferences in
-                preferences.gridColumns = size.columns
-                preferences.gridRows = size.rows
+                preferences.gridSize = size
             }
         }
     }
@@ -305,20 +304,5 @@ final class SettingsModel {
     @concurrent
     private nonisolated static func read(from url: URL) async throws -> Data {
         try Data(contentsOf: url)
-    }
-}
-
-/// A grid size Settings offers: every allowed column count for every allowed row count.
-struct GridSize: Hashable {
-    let columns: Int
-    let rows: Int
-
-    var capacity: Int {
-        columns * rows
-    }
-
-    /// Columns by rows, as in "7 × 5".
-    var text: String {
-        "\(columns) × \(rows)"
     }
 }

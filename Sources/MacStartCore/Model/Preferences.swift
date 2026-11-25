@@ -1,36 +1,74 @@
 /// The user's settings. Stored in `UserDefaults` and included in every export.
 public struct Preferences: Hashable, Sendable {
-    /// The column counts Settings offers. Grids outside these ranges look wrong on the screen sizes MacStart runs on.
-    public static let allowedGridColumns = 5...9
-    /// The row counts Settings offers.
-    public static let allowedGridRows = 4...6
+    /// The grid sizes Settings offers, grouped by rows. Each row count gets the three column counts that keep tiles
+    /// close to square on the screen sizes MacStart runs on; other grids look too sparse or too crowded.
+    public static let allowedGridSizes: [GridSize] = [
+        GridSize(columns: 5, rows: 4), GridSize(columns: 6, rows: 4), GridSize(columns: 7, rows: 4),
+        GridSize(columns: 6, rows: 5), GridSize(columns: 7, rows: 5), GridSize(columns: 8, rows: 5),
+        GridSize(columns: 7, rows: 6), GridSize(columns: 8, rows: 6), GridSize(columns: 9, rows: 6),
+    ]
 
     /// The global shortcut that toggles the overlay.
     public var hotKey: HotKey
-    /// Columns per page, kept within `allowedGridColumns`.
-    public var gridColumns: Int {
-        didSet { gridColumns = gridColumns.clamped(to: Self.allowedGridColumns) }
-    }
-    /// Rows per page, kept within `allowedGridRows`.
-    public var gridRows: Int {
-        didSet { gridRows = gridRows.clamped(to: Self.allowedGridRows) }
+    /// Columns by rows per page, kept to one of `allowedGridSizes`. Set as one value, so a change of both columns
+    /// and rows is never checked against a half-changed size.
+    public var gridSize: GridSize {
+        didSet { gridSize = gridSize.nearestAllowed }
     }
     public var launchAtLogin: Bool
 
-    /// Grid values outside the allowed ranges are clamped to the nearest allowed value.
+    /// A grid size that is not allowed becomes the nearest allowed one.
     public init(hotKey: HotKey, gridColumns: Int, gridRows: Int, launchAtLogin: Bool) {
         self.hotKey = hotKey
-        self.gridColumns = gridColumns.clamped(to: Self.allowedGridColumns)
-        self.gridRows = gridRows.clamped(to: Self.allowedGridRows)
+        self.gridSize = GridSize(columns: gridColumns, rows: gridRows).nearestAllowed
         self.launchAtLogin = launchAtLogin
     }
 
     /// Option-S, a 7 x 5 grid, and launch at login on.
     public static let `default` = Preferences(hotKey: .default, gridColumns: 7, gridRows: 5, launchAtLogin: true)
 
+    public var gridColumns: Int {
+        gridSize.columns
+    }
+
+    public var gridRows: Int {
+        gridSize.rows
+    }
+
     /// How many items fit on one page.
     public var pageCapacity: Int {
-        gridColumns * gridRows
+        gridSize.capacity
+    }
+}
+
+/// Columns by rows of a page.
+public struct GridSize: Hashable, Sendable {
+    public let columns: Int
+    public let rows: Int
+
+    public init(columns: Int, rows: Int) {
+        self.columns = columns
+        self.rows = rows
+    }
+
+    public var capacity: Int {
+        columns * rows
+    }
+
+    /// Columns by rows, as in "7 × 5".
+    public var text: String {
+        "\(columns) × \(rows)"
+    }
+
+    /// This size when it is allowed. Otherwise the rows move to the nearest allowed row count, then the columns to
+    /// the nearest column count allowed with those rows.
+    var nearestAllowed: GridSize {
+        // The unwraps are safe: `allowedGridSizes` is a non-empty constant, and every allowed row count has columns.
+        let allowed = Preferences.allowedGridSizes
+        let rows = rows.clamped(to: allowed.map(\.rows).min()!...allowed.map(\.rows).max()!)
+        let columnsForRows = allowed.filter { $0.rows == rows }.map(\.columns)
+        let columns = columns.clamped(to: columnsForRows.min()!...columnsForRows.max()!)
+        return GridSize(columns: columns, rows: rows)
     }
 }
 
@@ -42,8 +80,8 @@ extension Preferences: Codable {
         case launchAtLogin
     }
 
-    /// A grid size outside the allowed ranges, as in a backup from a version that allowed more, is clamped to the
-    /// nearest allowed size instead of failing the whole file.
+    /// A grid size that is not allowed, as in a backup from a version that allowed more, becomes the nearest
+    /// allowed size instead of failing the whole file.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(

@@ -60,14 +60,12 @@ struct LayoutSettingsPane: View {
                     "Grid size",
                     selection: Binding(get: { model.gridSize }, set: { model.requestGridSize($0) })
                 ) {
-                    ForEach(Preferences.allowedGridRows, id: \.self) { rows in
-                        if rows != Preferences.allowedGridRows.lowerBound {
+                    let sizes = Preferences.allowedGridSizes
+                    ForEach(sizes.indices, id: \.self) { index in
+                        if index > 0, sizes[index - 1].rows != sizes[index].rows {
                             Divider()
                         }
-                        ForEach(Preferences.allowedGridColumns, id: \.self) { columns in
-                            let size = GridSize(columns: columns, rows: rows)
-                            Text(size.text).tag(size)
-                        }
+                        Text(sizes[index].text).tag(sizes[index])
                     }
                 }
                 Text("Columns × rows. A new size asks to confirm first, because apps move to fill it.")

@@ -94,7 +94,7 @@ struct ExportTests {
         }
     }
 
-    @Test func importClampsAGridSizeOutsideTheAllowedRanges() throws {
+    @Test func importMovesAGridSizeThatIsNotAllowedToTheNearestAllowedOne() throws {
         #expect(Fixtures.exportV1.contains(#""gridColumns" : 8"#))
         let json = Fixtures.exportV1
             .replacingOccurrences(of: #""gridColumns" : 8"#, with: #""gridColumns" : 15"#)
@@ -102,8 +102,7 @@ struct ExportTests {
 
         let export = try Export(jsonData: Data(json.utf8))
 
-        #expect(export.preferences.gridColumns == Preferences.allowedGridColumns.upperBound)
-        #expect(export.preferences.gridRows == Preferences.allowedGridRows.lowerBound)
+        #expect(export.preferences.gridSize == GridSize(columns: 7, rows: 4))
     }
 
     @Test func aSnapshotKeepsWholeSecondsSoItSurvivesTheRoundTrip() throws {
